@@ -228,6 +228,8 @@ def parse_cmd_args():
         help='call contract\'s public method (without transaction)')
     parser_call.add_argument('--abi',
         help='contract ABI')
+    parser_call.add_argument('-q', '--quiet', action='store_true',
+        help='do not print returned value')
     parser_call.add_argument('contract_address',
         help='deployed contract address')
     parser_call.add_argument('contract_method', type=parse_method,
@@ -460,7 +462,8 @@ def do_call(args):
     elif args.expect_gt or args.expect_ge or args.expect_lt or args.expect_le:
         LOGGER.critical('cannot apply gerater/less assertions to %r', retval)
         sys.exit(1)
-    exec_report(args, retval)
+    if not args.quiet:
+        exec_report(args, retval)
 
 
 def do_send(args):
