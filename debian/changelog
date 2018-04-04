@@ -1,3 +1,11 @@
+ethester (0.1.1) unstable; urgency=low
+
+  * Minor fix for geth timeout: use only when not empty
+  * Add --quiet option for call command
+  * Fix timeout parsing
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Wed, 04 Apr 2018 22:00:37 +0300
+
 ethester (0.1.0) unstable; urgency=low
 
   * Initial release.
