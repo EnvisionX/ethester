@@ -729,7 +729,7 @@ def geth_exec(main_args, js_statement, errmsg=None):
         geth_ipc = main_args.ipc
 
     geth_timeout = get_tx_timeout(main_args) * 2
-    if GETH_TIMEOUT in os.environ:
+    if os.environ.get(GETH_TIMEOUT):
         geth_timeout = parse_timeout(os.environ[GETH_TIMEOUT])
     if main_args.geth_timeout:
         geth_timeout = main_args.geth_timeout
