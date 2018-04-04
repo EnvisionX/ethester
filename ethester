@@ -960,7 +960,9 @@ def get_tx_timeout(args):
 
     :rtype: positive integer
     """
-    tx_timeout = os.environ.get(TIMEOUT, DEF_TIMEOUT)
+    tx_timeout = DEF_TIMEOUT
+    if os.environ.get(TIMEOUT):
+        tx_timeout = parse_timeout(os.environ.get(TIMEOUT))
     if args.timeout:
         tx_timeout = args.timeout
     return tx_timeout
