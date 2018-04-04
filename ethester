@@ -1,0 +1,1128 @@
+#!/usr/bin/env python
+# coding=utf8
+
+"""
+Ethester - Swiss knife for testing Ethereum smart contracts.
+"""
+
+import argcomplete
+import argparse
+import json
+import logging
+import os
+import os.path
+import subprocess
+import sys
+import tempfile
+import time
+import threading
+
+
+# ----------------------------------------------------------------------
+# Global vars
+
+# Default values
+DEF_LOGLEVEL = 'warning'
+DEF_TIMEOUT = 120
+DEF_IPC = os.path.join(os.environ.get('HOME', ''), '.ethereum/geth.ipc')
+DEF_CONTRACT_PATH = '.:build:contracts'
+DEF_GAS_PRICE = '2 gwei'
+DEF_GAS_LIMIT_SEND = 21000
+DEF_GAS_LIMIT_CALL = 5000000
+DEF_ACCOUNT_PASSWORD = ''
+
+# Environment variables
+
+# Log level
+LOGLEVEL = 'ETHESTER_LOGLEVEL'
+# Path to geth executable
+GETH_PATH = 'ETHESTER_GETH_PATH'
+# Path to geth IPC socket
+GETH_IPC = 'ETHESTER_GETH_IPC'
+# Max time to wait for 'geth attach' command, in seconds
+GETH_TIMEOUT = 'ETHESTER_GETH_TIMEOUT'
+# Max time to wait for transaction, in seconds
+TIMEOUT = 'ETHESTER_TIMEOUT'
+# Where to search contract files (ABI, BIN)?
+# Colon separated list of directories
+CONTRACT_PATH = 'ETHESTER_CONTRACT_PATH'
+GAS_LIMIT = 'ETHESTER_GAS_LIMIT'
+GAS_PRICE = 'ETHESTER_GAS_PRICE'
+ACCOUNT_PASSWORD = 'ETHESTER_ACCOUNT_PASSWORD'
+DUMP_DIR = 'ETHESTER_DUMP_DIR'
+
+# Internal global variables
+
+# Link to spawned geth process, if any.
+# Used only to kill it in case of emergency.
+SUBPROCESS = None
+
+## Here we'll keep data received from stdin
+## (for reuse when more than one arg refers to stdin data)
+STDIN_DATA = None
+
+WEI_FACTORS = {
+    'wei':        1,
+    'kwei':       1000,
+    'ada':        1000,
+    'femtoether': 1000,
+    'mwei':       1000000,
+    'babbage':    1000000,
+    'picoether':  1000000,
+    'gwei':       1000000000,
+    'shannon':    1000000000,
+    'nanoether':  1000000000,
+    'nano':       1000000000,
+    'szabo':      1000000000000,
+    'microether': 1000000000000,
+    'micro':      1000000000000,
+    'finney':     1000000000000000,
+    'milliether': 1000000000000000,
+    'milli':      1000000000000000,
+    'ether':      1000000000000000000,
+    'kether':     1000000000000000000000,
+    'grand':      1000000000000000000000,
+    'einstein':   1000000000000000000000,
+    'mether':     1000000000000000000000000,
+    'gether':     1000000000000000000000000000,
+    'tether':     1000000000000000000000000000000
+    }
+
+def main():
+    """
+    Entry point.
+    """
+    global LOGGER
+    # parse command line args
+    cmd_args = parse_cmd_args()
+    # configure the Logger
+    verbosities = {
+        'critical': 50,
+        'error': 40,
+        'warning': 30,
+        'info': 20,
+        'debug': 10}
+    level = os.environ.get(LOGLEVEL, DEF_LOGLEVEL)
+    if cmd_args.loglevel is not None:
+        level = cmd_args.loglevel
+    level = verbosities.get(level, verbosities[DEF_LOGLEVEL])
+    if cmd_args.verbose:
+        level = min(verbosities['info'], level)
+    logging.basicConfig(
+        format='%(asctime)s %(name)s %(levelname)8s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S', level=level)
+    LOGGER = logging.getLogger('ethester')
+    cmd_args.func(cmd_args)
+
+
+def parse_cmd_args():
+    """
+    Parse command line arguments and return an object with
+    parsed tool arguments.
+
+    :rtype: object
+    """
+    parser = argparse.ArgumentParser(
+        description='Do some work with Ethereum network.')
+    parser.add_argument('-l', '--loglevel', default=None,
+        help='log level. Default is "warning". Valid'
+        ' values are: "debug", "info", "warning", "error", "critical".')
+    parser.add_argument('-v', '--verbose', action='store_true',
+        help='Alias for --loglevel=info')
+    parser.add_argument('--ipc', default=None,
+        help='path to geth IPC socket. Default is %r' % DEF_IPC)
+    parser.add_argument('--contract-path', default=None,
+        help='colon separated directories where ABI and BIN'
+        ' contract files will be searched. Default is %r' % DEF_CONTRACT_PATH)
+    parser.add_argument('--geth-path', default=None,
+        help='Path to geth executable. By default it will be searched'
+        ' in default executables paths.')
+    parser.add_argument('--timeout', type=parse_timeout, default=None,
+        help='how long to wait for a transaction, in seconds.'
+        ' Default is %r.' % DEF_TIMEOUT)
+    parser.add_argument('--geth-timeout', type=parse_timeout, default=None,
+        help='how long to wait for a geth process, in seconds.'
+        ' Default value calculated as transaction timeout x2.')
+    parser.add_argument('--gas-price', type=parse_ether,
+        default=parse_ether(DEF_GAS_PRICE),
+        help='gas price')
+    parser.add_argument('--gas-limit', type=int, default=None,
+        help='gas limit. Default value depends on your transaction type.'
+        ' For transferring ether is %r. For method call is %r' %
+        (DEF_GAS_LIMIT_SEND, DEF_GAS_LIMIT_CALL))
+    parser.add_argument('--dump-dir', default=None,
+        help='if set, all transaction scripts will be dumped to this directory')
+    subparsers = parser.add_subparsers(
+        title='Commands', description='Valid commands')
+
+    parser_new_account = subparsers.add_parser('new-account',
+        help='add new account')
+    parser_new_account.add_argument('--password', default=DEF_ACCOUNT_PASSWORD,
+        help='password for a new account')
+    parser_new_account.add_argument('-s', '--string', action='store_true',
+        help='print new account address as plain string instead of JSON')
+    parser_new_account.set_defaults(func=do_new_account)
+
+    parser_balance = subparsers.add_parser('balance',
+        help='print current account balance')
+    parser_balance.add_argument('-u', '--unit', default='wei',
+        help='units')
+    parser_balance.add_argument('-d', '--decimals', default=None,
+        help='how many decimals after the point to print.'
+        ' Default is to print all')
+    parser_balance.add_argument('address',
+        help='account or contract address')
+    parser_balance.add_argument('-e', '--expect', type=parse_ether,
+        help='execute strict assertion')
+    parser_balance.add_argument('--expect-gt', type=parse_ether,
+        help='execute assertion: balance is greater than ...')
+    parser_balance.add_argument('--expect-ge', type=parse_ether,
+        help='execute assertion: balance is equal or greater than ...')
+    parser_balance.add_argument('--expect-lt', type=parse_ether,
+        help='execute assertion: balance is less than ...')
+    parser_balance.add_argument('--expect-le', type=parse_ether,
+        help='execute assertion: balance is equal or less than ...')
+    parser_balance.set_defaults(func=do_balance)
+
+    parser_accounts = subparsers.add_parser('accounts',
+        help='list accounts stored in the geth node')
+    parser_accounts.add_argument('-j', '--json', action='store_true',
+        help='Output in JSON')
+    parser_accounts.add_argument('-n', '--nice', action='store_true',
+        help='Output in multiline JSON (make sense with -j/--json)')
+    parser_accounts.set_defaults(func=do_accounts)
+
+    parser_exec = subparsers.add_parser('exec',
+        help='execute JavaScript statement on Geth node')
+    parser_exec.add_argument('statement',
+        help='JavaScript statement to execute')
+    parser_exec.add_argument('expect', nargs='?',
+        help='expected JSON value')
+    parser_exec.add_argument('-n', '--nice', action='store_true',
+        help='Output in multiline JSON')
+    parser_exec.add_argument('-s', '--string', action='store_true',
+        help='Treat returned value as string and print it as'
+        ' plain text instead of JSON-encoded string')
+    parser_exec.set_defaults(func=do_exec)
+
+    parser_deploy = subparsers.add_parser('deploy',
+        help='deploy new contract to the network')
+    parser_deploy.add_argument('--abi',
+        help='contract ABI')
+    parser_deploy.add_argument('--bin',
+        help='contract compiled bytecode')
+    parser_deploy.add_argument('sender_address',
+        help='sender account address')
+    parser_deploy.add_argument('contract_name',
+        help='contract name')
+    parser_deploy.add_argument('parameter', nargs='*',
+        help='constructor parameters')
+    parser_deploy.add_argument('-n', '--nice', action='store_true',
+        help='Output in multiline JSON')
+    parser_deploy.add_argument('--password', default=DEF_ACCOUNT_PASSWORD,
+        help='password to unlock sender account')
+    parser_deploy.add_argument('-s', '--string', action='store_true',
+        help='print new contract address as plain string instead of JSON')
+    parser_deploy.set_defaults(func=do_deploy)
+
+    parser_call = subparsers.add_parser('call',
+        help='call contract\'s public method (without transaction)')
+    parser_call.add_argument('--abi',
+        help='contract ABI')
+    parser_call.add_argument('contract_address',
+        help='deployed contract address')
+    parser_call.add_argument('contract_method', type=parse_method,
+        help='contract name and method, like ContractName.MethodName')
+    parser_call.add_argument('parameter', nargs='*',
+        help='method parameters')
+    parser_call.add_argument('-e', '--expect', default=None,
+        help='expected JSON value')
+    parser_call.add_argument('-n', '--nice', action='store_true',
+        help='Output in multiline JSON')
+    parser_call.add_argument('-s', '--string', action='store_true',
+        help='Treat returned value as string and print it as'
+        ' plain text instead of JSON-encoded string')
+    parser_call.add_argument('--expect-gt', type=parse_ether,
+        help='execute assertion: value is greater than N.'
+        ' Applied only when number returned.')
+    parser_call.add_argument('--expect-ge', type=parse_ether,
+        help='execute assertion: value is equal or greater than N.'
+        ' Applied only when number returned.')
+    parser_call.add_argument('--expect-lt', type=parse_ether,
+        help='execute assertion: value is less than N.'
+        ' Applied only when number returned.')
+    parser_call.add_argument('--expect-le', type=parse_ether,
+        help='execute assertion: value is equal or less than N.'
+        ' Applied only when number returned.')
+    parser_call.set_defaults(func=do_call)
+
+    parser_send = subparsers.add_parser('send',
+        help='send some ether from one account to another')
+    parser_send.add_argument('from_address',
+        help='sender account address')
+    parser_send.add_argument('to_address',
+        help='receiver account address')
+    parser_send.add_argument('value', type=parse_ether,
+        help='ether amount to send')
+    parser_send.add_argument('--password',
+        default=DEF_ACCOUNT_PASSWORD,
+        help='password to unlock sender account')
+    parser_send.add_argument('--data',
+        help='hex data which will be sent within the transaction')
+    parser_send.set_defaults(func=do_send)
+
+    parser_tran = subparsers.add_parser('tran',
+        help='send transaction to the network')
+    parser_tran.add_argument('--abi',
+        help='contract ABI')
+    parser_tran.add_argument('from_address',
+        help='sender account address')
+    parser_tran.add_argument('to_address',
+        help='receiver contract address')
+    parser_tran.add_argument('--value', type=parse_ether, default=0,
+        help='ether amount to send')
+    parser_tran.add_argument('contract_method', type=parse_method,
+        help='contract name and method, like ContractName.MethodName')
+    parser_tran.add_argument('parameter', nargs='*',
+        help='contract method parameters')
+    parser_tran.add_argument('--password',
+        default=DEF_ACCOUNT_PASSWORD,
+        help='password to unlock sender account')
+    parser_tran.set_defaults(func=do_tran)
+    argcomplete.autocomplete(parser)
+    return parser.parse_args()
+
+
+def do_new_account(args):
+    """
+    Create new account on a geth node.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    password = get_password(args)
+    retval, _ = geth_exec(args,
+        'personal.newAccount("%s")' % (password,))
+    args.nice = False
+    exec_report(args, retval)
+
+
+def do_balance(args):
+    """
+    Print account balance.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    address = resolve_arg(args.address)
+    retval, _ = geth_exec(args, 'eth.getBalance("%s").toString(10);' % (address,))
+    retval = int(retval)
+    if args.expect is not None:
+        expect_equal(retval, str(args.expect), value_type='uint')
+    make_num_asserts(args, retval)
+    retval /= WEI_FACTORS[args.unit]
+    args.nice = False
+    args.string = False
+    exec_report(args, retval)
+
+
+def do_accounts(args):
+    """
+    List accounts handled by the geth node.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    retval, _ = geth_exec(args, 'eth.accounts')
+    if args.json:
+        print_json(retval, args.nice)
+    else:
+        for a in retval:
+            print str(a)
+
+
+def do_exec(args):
+    """
+    Execute custom JavaScript code on geth node.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    retval, _ = geth_exec(args, resolve_arg(args.statement))
+    if args.expect:
+        expect_equal(retval, resolve_arg(args.expect))
+    exec_report(args, retval)
+
+
+def do_deploy(args):
+    """
+    Deploy contract to the Ethereum network.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    contract = resolve_arg(args.contract_name)
+    sender = resolve_arg(args.sender_address)
+    password = get_password(args)
+    gas_limit = int(os.environ.get(GAS_LIMIT,
+        '%d' % DEF_GAS_LIMIT_CALL))
+    if args.gas_limit:
+        gas_limit = args.gas_limit
+    gas_price = parse_ether(os.environ.get(GAS_PRICE,
+        DEF_GAS_PRICE))
+    # read and parse ABI
+    if args.abi:
+        abi_json = json.loads(resolve_arg(args.abi))
+    else:
+        abi_json = read_contract_abi(args, contract)
+    abi = json.dumps(abi_json, separators=(',', ':'))
+    # read bytecode
+    if args.bin:
+        bytecode = resolve_arg(args.bin)
+    else:
+        bytecode = read_contract_bytecode(args, contract)
+    # encode parameters for constructor
+    cargs = encode_method_parameters(args, abi_json,
+        contract, '', args.parameter)
+    if cargs:
+        cargs += ','
+    # generate transaction script
+    js = """
+    personal.unlockAccount('%s', '%s');
+    var txIns = eth.contract(%s).new(%s{
+        from: '%s',
+        gas: %s, gasPrice: %s,
+        data: '0x%s'
+    });
+    var txRcp;
+    for (var tries = 0; tries < %d; tries++) {
+        admin.sleep(1);
+        txRcp = eth.getTransactionReceipt(txIns.transactionHash);
+        if (txRcp != null) break;
+    };
+    if (txRcp == null) { throw 'error: timeout'; };
+    JSON.stringify({
+        block: txRcp.blockNumber,
+        block_hash: txRcp.blockHash,
+        tx_hash: txRcp.transactionHash,
+        gas_used: txRcp.gasUsed,
+        address: txRcp.contractAddress
+    });
+    """ % (sender, password,
+        abi, cargs, sender, price_to_js(gas_limit),
+        price_to_js(gas_price), bytecode, get_tx_timeout(args))
+    dump_hook(args, 'deploy', contract, js)
+    js = js.replace('\n', '', -1)
+    retval, _ = geth_exec(args, js)
+    o = json.loads(retval)
+    LOGGER.info('transaction info:\n'
+        '     block:      %d\n'
+        '     block hash: %s\n'
+        '     tx hash:    %s\n'
+        '     gas used:   %d\n'
+        '     address:    %s'
+        '' % (o['block'], str(o['block_hash']), str(o['tx_hash']),
+            o['gas_used'], str(o['address'])))
+    exec_report(args, o['address'])
+
+
+def do_call(args):
+    """
+    Call public method of existing contract without
+    creating a transaction.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    (contract, method) = args.contract_method
+    if args.abi:
+        abi_json = json.loads(resolve_arg(args.abi))
+    else:
+        abi_json = read_contract_abi(args, contract)
+    abi = json.dumps(abi_json, separators=(',', ':'))
+    cargs = encode_method_parameters(args, abi_json,
+        contract, method, args.parameter)
+    rettype = get_method_ret_type(abi_json, method)
+    if rettype is not None and 'int' in rettype:
+        LOGGER.debug('rettype=%r', rettype)
+        js = "eth.contract(%s).at('%s').%s(%s).toString(10);" % (abi,
+            resolve_arg(args.contract_address),
+            resolve_arg(method), cargs)
+        retval, _ = geth_exec(args, js)
+        retval = int(retval)
+    else:
+        js = "eth.contract(%s).at('%s').%s(%s);" % (abi,
+            resolve_arg(args.contract_address),
+            resolve_arg(method), cargs)
+        retval, _ = geth_exec(args, js)
+    if args.expect:
+        expect_equal(retval, resolve_arg(args.expect), abi_json, method)
+    if rettype is not None and 'int' in rettype:
+        make_num_asserts(args, retval)
+    elif args.expect_gt or args.expect_ge or args.expect_lt or args.expect_le:
+        LOGGER.critical('cannot apply gerater/less assertions to %r', retval)
+        sys.exit(1)
+    exec_report(args, retval)
+
+
+def do_send(args):
+    """
+    Send some ether from one account to another.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    sender = resolve_arg(args.from_address)
+    receiver = resolve_arg(args.to_address)
+    password = get_password(args)
+    data = ''
+    if args.data:
+        data = resolve_arg(args.data)
+        if data:
+            data = ',data: "0x%s"' % (data,)
+    gas_limit = int(os.environ.get(GAS_LIMIT,
+        '%d' % DEF_GAS_LIMIT_SEND))
+    if args.gas_limit:
+        gas_limit = args.gas_limit
+    gas_price = parse_ether(os.environ.get(GAS_PRICE,
+        DEF_GAS_PRICE))
+    js = """
+    personal.unlockAccount('%s', '%s');
+    txHash = web3.eth.sendTransaction({
+        from: '%s',
+        to: '%s',
+        gas: %s, gasPrice: %s,
+        value: %s%s
+    });
+    var txRcp;
+    for (var tries = 0; tries < %d; tries++) {
+        admin.sleep(1);
+        txRcp = eth.getTransactionReceipt(txHash);
+        if (txRcp != null) break;
+    };
+    if (txRcp == null) { throw 'error: timeout'; };
+    JSON.stringify({
+        block: txRcp.blockNumber,
+        block_hash: txRcp.blockHash,
+        tx_hash: txRcp.transactionHash,
+        gas_used: txRcp.gasUsed,
+    });
+    """ % (sender, password, sender, receiver,
+        price_to_js(gas_limit), price_to_js(gas_price),
+        price_to_js(args.value), data, get_tx_timeout(args))
+    dump_hook(args, 'transfer', '%s-%s' % (sender, receiver), js)
+    js = js.replace('\n', '', -1)
+    retval, _ = geth_exec(args, js)
+    o = json.loads(retval)
+    LOGGER.info('transaction info:\n'
+        '     block:      %d\n'
+        '     block hash: %s\n'
+        '     tx hash:    %s\n'
+        '     gas used:   %d'
+        '' % (o['block'], str(o['block_hash']), str(o['tx_hash']),
+            o['gas_used']))
+
+
+def do_tran(args):
+    """
+    Call external method of existing contract.
+    New transaction will be created.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    sender = resolve_arg(args.from_address)
+    receiver = resolve_arg(args.to_address)
+    password = get_password(args)
+    (contract, method) = args.contract_method
+    if args.abi:
+        abi_json = json.loads(resolve_arg(args.abi))
+    else:
+        abi_json = read_contract_abi(args, contract)
+    abi = json.dumps(abi_json, separators=(',', ':'))
+    cargs = encode_method_parameters(args, abi_json,
+        contract, method, args.parameter)
+    if cargs:
+        cargs += ','
+    gas_limit = int(os.environ.get(GAS_LIMIT,
+        '%d' % DEF_GAS_LIMIT_CALL))
+    if args.gas_limit:
+        gas_limit = args.gas_limit
+    gas_price = parse_ether(os.environ.get(GAS_PRICE,
+        DEF_GAS_PRICE))
+    js = """
+    personal.unlockAccount('%s', '%s');
+    var txHash = web3.eth.contract(%s).at('%s').%s(%s {
+        from: '%s',
+        gas: %s, gasPrice: %s,
+        value: %s
+    });
+    var txRcp;
+    for (var tries = 0; tries < %d; tries++) {
+        admin.sleep(1);
+        txRcp = eth.getTransactionReceipt(txHash);
+        if (txRcp != null) break;
+    };
+    if (txRcp == null) { throw 'error: timeout'; };
+    JSON.stringify({
+        block: txRcp.blockNumber,
+        block_hash: txRcp.blockHash,
+        tx_hash: txRcp.transactionHash,
+        gas_used: txRcp.gasUsed,
+    });
+    """ % (sender, password, abi, receiver, method, cargs,
+        sender, price_to_js(gas_limit), price_to_js(gas_price),
+        price_to_js(args.value), get_tx_timeout(args))
+    dump_hook(args, 'tran', '%s.%s' % (contract, method), js)
+    js = js.replace('\n', '', -1)
+    retval, _ = geth_exec(args, js)
+    o = json.loads(retval)
+    LOGGER.info('transaction info:\n'
+        '     block:      %d\n'
+        '     block hash: %s\n'
+        '     tx hash:    %s\n'
+        '     gas used:   %d'
+        '' % (o['block'], str(o['block_hash']), str(o['tx_hash']),
+            o['gas_used']))
+
+
+def expect_equal(retval, expected, abi=None, method=None, value_type=None):
+    """
+    Check if value returned by JavaScript code equals to string
+    passed as command line argument with --expect.
+
+    :param retval: parsed JSON value, returned by JavaScript snippet
+    :type retval: any
+
+    :param expected: expected value
+    :type expected: string
+
+    :param abi: contract ABI, if applied
+    :type abi: list of dicts
+
+    :param method: called contract method name
+    :type method: string
+
+    :param value_type: solidity type name of the value, returned by
+       JavaScript snippet. Kinda replacement for (abi,method) args.
+    :type value_type: string
+    """
+    if abi and method:
+        outputs_info = get_method_info(abi, method).get(u'outputs', [])
+        if len(outputs_info) != 1:
+            types = ','.join([str(i[u'type']) for i in outputs_info])
+            LOGGER.critical('method you cannot use --expect with %s(%s)',
+                method, types)
+            sys.exit(1)
+        value_type = str(outputs_info[0][u'type'])
+    if value_type:
+        expected = canonicalize_method_param(
+            resolve_arg(expected), value_type)
+        LOGGER.debug('canonicalized expected (%s): %r',
+            value_type, expected)
+    else:
+        expected = json.dumps(json.loads(expected), sort_keys=True,
+            separators=(',', ':'))
+    plain = json.dumps(retval, sort_keys=True, separators=(',', ':'))
+    if plain != expected:
+        LOGGER.critical('assertion failed. Expected %r but found %r',
+            expected, plain)
+        sys.exit(1)
+    LOGGER.info('assertion X = %s OK', plain)
+
+
+def make_num_asserts(args, value):
+    """
+    Make greater/less assertions with the number.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+
+    :param value: numeric value to test
+    :type value: integer
+    """
+    if args.expect_gt is not None:
+        if value <= args.expect_gt:
+            LOGGER.critical('assertion failed: expected %d < X,'
+                ' but X is %d', args.expect_gt, value)
+            sys.exit(1)
+        LOGGER.info('assertion %d < X OK' % args.expect_gt)
+    if args.expect_ge is not None:
+        if value < args.expect_ge:
+            LOGGER.critical('assertion failed: expected %d =< X,'
+                ' but X is %d', args.expect_ge, value)
+            sys.exit(1)
+        LOGGER.info('assertion %d =< X OK' % args.expect_ge)
+    if args.expect_lt is not None:
+        if args.expect_lt <= value:
+            LOGGER.critical('assertion failed: expected X < %d,'
+                ' but X is %d', args.expect_lt, value)
+            sys.exit(1)
+        LOGGER.info('assertion X < %d OK' % args.expect_lt)
+    if args.expect_le is not None:
+        if args.expect_le < value:
+            LOGGER.critical('assertion failed: expected X =< %d,'
+                ' but X is %d', args.expect_le, value)
+            sys.exit(1)
+        LOGGER.info('assertion X =< %d OK' % args.expect_le)
+
+
+def get_method_ret_type(abi, method):
+    """
+    Get returned value type for method.
+    Will return non-None value only when method returns exactly one
+    value.
+
+    :param abi: contract ABI, if applied
+    :type abi: list of dicts
+
+    :param method: called contract method name
+    :type method: string
+
+    :rtype: string or NoneType
+    """
+    method_info = get_method_info(abi, method)
+    if method_info is None:
+        return None
+    types = [str(i[u'type']) for i in method_info.get(u'outputs', [])]
+    if len(types) == 1:
+        return types[0]
+    return None
+
+
+def price_to_js(wei):
+    """
+    Generate JavaScript code representing big number.
+
+    :param wei: big number
+    :type wei: integer
+
+    :rtype: string
+    """
+    return 'new BigNumber("%d")' % wei
+
+
+def geth_exec(main_args, js_statement, errmsg=None):
+    """
+    Run 'geth attach' command as a subprocess.
+    Return data value returned by JavaScript statement and any extra
+    output emitted by the statement as a second value.
+
+    :param main_args: parsed command line args for ethester.
+    :type main_args: namespace
+
+    :param js_statement: JavaScript code to execute
+    "type js_statement: string
+
+    :param errmsg: error message to report when geth command fails
+    :type errmsg: string or NoneType
+
+    :rtype: (JSON, string)
+    """
+    geth_path = os.environ.get(GETH_PATH, 'geth')
+    if main_args.geth_path:
+        geth_path = main_args.geth_path
+
+    geth_ipc = os.environ.get(GETH_IPC, DEF_IPC)
+    if main_args.ipc:
+        geth_ipc = main_args.ipc
+
+    geth_timeout = get_tx_timeout(main_args) * 2
+    if GETH_TIMEOUT in os.environ:
+        geth_timeout = parse_timeout(os.environ[GETH_TIMEOUT])
+    if main_args.geth_timeout:
+        geth_timeout = main_args.geth_timeout
+
+    args = [geth_path, 'attach', '--exec', js_statement, geth_ipc]
+    LOGGER.debug('executing %r', args)
+    try:
+        SUBPROCESS = subprocess.Popen(args, stdin=None, close_fds=True,
+            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        timeouted = True
+        timer = threading.Timer(geth_timeout, SUBPROCESS.kill)
+        try:
+            timer.start()
+            (outdata, errdata) = SUBPROCESS.communicate()
+            timeouted = False
+        finally:
+            timer.cancel()
+        if timeouted:
+            LOGGER.critical('running geth process exceeded'
+                ' configured max timeout.')
+            LOGGER.critical('stdout is: %r', outdata)
+            LOGGER.critical('stderr is: %r', errdata)
+        else:
+            LOGGER.debug('stdout is: %r', outdata)
+            LOGGER.debug('stderr is: %r', errdata)
+        retcode = SUBPROCESS.returncode
+        SUBPROCESS = None
+        if retcode == 0:
+            (extra, _, encoded_json) = outdata.strip().rpartition('\n')
+            LOGGER.debug('got extra data is: %r', extra)
+            LOGGER.debug('got encoded JSON is: %r', encoded_json)
+            try:
+                return (json.loads(encoded_json), extra)
+            except ValueError as exc:
+                LOGGER.critical('geth process returned malformed JSON: %r.'
+                    ' Extra output: %r', encoded_json, extra)
+                sys.exit(1)
+        LOGGER.critical('geth process finished with exit code %r', retcode)
+        sys.exit(1)
+    except Exception as exc:
+        if errmsg is not None:
+            LOGGER.critical(errmsg, exc_info=True)
+        else:
+            LOGGER.critical('geth process %r failed', args, exc_info=True)
+        sys.exit(1)
+
+
+def encode_method_parameters(args, abi, contract, method, parameters):
+    """
+    Encode contract method parameters to JavaScript code.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+
+    :param abi: parsed contract ABI
+    :type abi: any
+
+    :param contract: contract name
+    :type contract: string
+
+    :param method: contract method name. If empty, constructor will be used
+    :type method: string
+
+    :param parameters: list of method parameters, as passed with command line
+    :type parameters: list of strings
+
+    :rtype: string
+    """
+    method_info = get_method_info(abi, method)
+    if method_info is None:
+        LOGGER.critical('there is no public method like %s.%s() in the ABI',
+            contract, method if method else contract)
+        sys.exit(1)
+    types = [str(i.get(u'type')) for i in method_info.get(u'inputs', [])]
+    LOGGER.debug('method args: %r', types)
+    if len(types) != len(parameters):
+        LOGGER.critical('%s.%s(%s): expected %r but %r parameters found',
+            contract, method, ','.join(types), len(types), len(parameters))
+        sys.exit(1)
+    res = []
+    for i in range(len(parameters)):
+        res.append(canonicalize_method_param(
+            resolve_arg(parameters[i]), types[i]))
+    return ','.join(res)
+
+
+def canonicalize_method_param(value, param_type):
+    """
+    Format value, passed as command line argument to ethester
+    to value, ready to insert into JavaScript code.
+
+    :param value: raw param value (e.g. as passed to cmd)
+    :type value: string
+
+    :param param_type: solidity type name
+    :type param_type: string
+
+    :rtype: string
+    """
+    if param_type in ('uint256', 'uint'):
+        try:
+            value = str(parse_ether(value))
+        except ValueError:
+            pass
+    elif param_type in ('address', 'string'):
+        if value[0] not in ('"', "'"):
+            value = '"%s"' % (value,)
+    return value
+
+
+def get_method_info(abi, method=None):
+    """
+    Lookup for method info in contract ABI.
+
+    :param abi: contract ABI (parsed JSON)
+    :type abi: list of dicts
+
+    :param method: method name. When not set, constructor is assumed
+    :type method: string or NoneType
+
+    :rtype: dict or NoneType
+    """
+    for entry in abi:
+        if method is not None:
+            if str(entry.get(u'name', '')) == method:
+                return entry
+        else:
+            if str(entry.get(u'type', '')) == 'constructor':
+                return entry
+
+
+def dump_hook(args, tx_type, obj, script):
+    """
+    If configured with --dump-dir, will write JavaScript
+    code to new file within dump directory.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+
+    :param tx_type: transaction type: deploy, call, send
+    :type tx_type: string
+
+    :param obj: object name (contract or method)
+    :type obj: string
+
+    :param script: JavaScript code
+    :type script: string
+    """
+    dump_dir = os.environ.get(DUMP_DIR)
+    if args.dump_dir:
+        dump_dir = args.dump_dir
+    if not dump_dir:
+        return
+    basename = '%s-%s-%s.js' % (time.strftime('%Y%m%d_%H%M%S'),
+        tx_type, obj)
+    absname = os.path.join(dump_dir, basename)
+    with open(absname, 'w') as fd:
+        fd.write(script + '\n')
+
+
+def exec_report(args, retval):
+    """
+    Print result of JavaScript statement execution.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+
+    :param retval: parsed JSON value, returned by the statement
+    :type retval: any
+    """
+    if args.string:
+        if isinstance(retval, (str, unicode)):
+            sys.stdout.write('%s\n' % str(retval))
+        else:
+            LOGGER.critical('type assertion failed.'
+                    ' Expected string but found %r', retval)
+            sys.exit(1)
+    else:
+        print_json(retval, args.nice)
+
+
+def parse_ether(s):
+    """
+    Parse ether amount and convert it to wei units.
+
+    :param s: string representation
+    :type s: string
+
+    :rtype: positive integer
+    """
+    ss = resolve_arg(s).strip().lower()
+    if ss == '':
+        ValueError('invalid ether amount: %r' % (s,))
+    num = ''
+    while ss:
+        c, ss = ss[0], ss[1:]
+        if c.isdigit():
+            num += c
+        else:
+            ss = (c + ss).strip()
+            break
+    num = int(num) if num else 1
+    if not ss:
+        return num
+    if ss not in WEI_FACTORS:
+        ValueError('invalid ether amount: %r', (s,))
+    return num * WEI_FACTORS[ss]
+
+
+def parse_timeout(s):
+    """
+    Parse timeout value. converting it to seconds.
+
+    :param s: string representation
+    :type s: string
+
+    :rtype: positive integer
+    """
+    seconds = int(s)
+    if seconds < 0:
+        ValueError('invalid timeout value: %r' % (s,))
+    return seconds
+
+
+def get_tx_timeout(args):
+    """
+    Get configured max timeout for a transaction.
+
+    :param main_args: parsed command line args for ethester.
+    :type main_args: namespace
+
+    :rtype: positive integer
+    """
+    tx_timeout = os.environ.get(TIMEOUT, DEF_TIMEOUT)
+    if args.timeout:
+        tx_timeout = args.timeout
+    return tx_timeout
+
+
+def resolve_arg(s):
+    """
+    Resolve argument value.
+    Arguments can be plain and can refer to an external
+    files. When written as '@something', we will substitute
+    it with contents of 'something' file with all spaces
+    stripped.
+    When written as '@-', stdin will be read. You can use '@-'
+    multiple times safely. In this case every such argument
+    will be replaced with stdin data.
+    Spaces from plain value are not stripped!
+
+    :param s: command line argument
+    :type s: string
+
+    :rtype: string
+    """
+    global STDIN_DATA
+    if not isinstance(s, str):
+        return s
+    if s.startswith('@'):
+        s = s[1:]
+        if s == '-':
+            if STDIN_DATA is None:
+                STDIN_DATA = sys.stdin.read().strip()
+            return STDIN_DATA
+        with open(s, 'r') as fd:
+            return fd.read().strip()
+    return s
+
+
+def print_json(obj, nice=False):
+    """
+    Print JSON object to stdout.
+
+    :param obj: parsed JSON object
+    :type obj: any
+
+    :param nice: if truth, JSON will be encoded in multiline with indents
+    :type nice: bool
+    """
+    if nice:
+        json.dump(obj, sys.stdout, sort_keys=True,
+            indent=2, separators=(', ', ': '))
+    else:
+        json.dump(obj, sys.stdout, sort_keys=True,
+            separators=(',', ':'))
+    sys.stdout.write('\n')
+
+
+def read_raw_contract_data(args, filename):
+    """
+    Look for contract data file in all configured
+    directories.
+
+    :param args: parsed command line arguments
+    :type args: namespace
+
+    :param filename: basename of the file to search
+    :type filename: string
+
+    :rtype: string
+    """
+    paths = os.environ.get(CONTRACT_PATH, DEF_CONTRACT_PATH)
+    if args.contract_path:
+        paths = args.contract_path
+    for p in paths.split(':'):
+        absname = os.path.join(p, filename)
+        LOGGER.debug('looking for %r...', absname)
+        if os.path.exists(absname) and os.path.isfile(absname):
+            with open(absname, 'r') as fd:
+                data = fd.read()
+                return data
+        LOGGER.debug('   not found')
+
+
+def read_contract_abi(args, contract_name):
+    """
+    Read and parse contract ABI file.
+
+    :param args: parsed command line args
+    :type args: namespace
+
+    :param contract_name: name of the Solidity contract
+    :type contract_name: string
+
+    :rtype: parsed JSON object
+    """
+    filename = contract_name + '.abi'
+    encoded = read_raw_contract_data(args, filename)
+    if not encoded:
+        LOGGER.critical('ABI file %r not found', filename)
+        sys.exit(1)
+    obj = json.loads(encoded)
+    assert isinstance(obj, list)
+    return obj
+
+
+def read_contract_bytecode(args, contract_name):
+    """
+    Read contract BIN file.
+
+    :param args: parsed command line args
+    :type args: namespace
+
+    :param contract_name: name of the Solidity contract
+    :type contract_name: string
+
+    :rtype: string
+    """
+    filename = contract_name + '.bin'
+    data = read_raw_contract_data(args, filename)
+    if not data:
+        LOGGER.critical('BIN file %r not found', filename)
+        sys.exit(1)
+    return data
+
+
+def parse_method(s):
+    """
+    Parse contract and method name.
+
+    :param s: name in format ContractName.MethodName
+    :type s: string
+
+    :rtype: (string, string)
+    """
+    a = resolve_arg(s).split('.')
+    if len(a) != 2 or not a[0] or not a[1]:
+        ValueError('bad method: %r' % s)
+    return (a[0], a[1])
+
+
+def get_password(args):
+    """
+    Get password for account unlocking.
+
+    :param args: parsed command line arguments
+    :type args: namespace
+
+    :rtype: string
+    """
+    password = os.environ.get(ACCOUNT_PASSWORD, DEF_ACCOUNT_PASSWORD)
+    if args.password:
+        password = resolve_arg(args.password)
+    return password
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        if SUBPROCESS is not None:
+            SUBPROCESS.kill()
+    except Exception:
+        if SUBPROCESS is not None:
+            SUBPROCESS.kill()
+        raise
