@@ -1,0 +1,19 @@
+Source: ethester
+Section: utils
+Priority: extra
+Maintainer: Aleksey Morarash <aleksey.morarash@gmail.com>
+Build-Depends: debhelper, python, ethereum, solidity
+Standards-Version: 4.1.3
+Homepage: https://github.com/EnvisionX/ethester
+
+Package: ethester
+Architecture: all
+Depends: python, ethereum
+Description: Command line interface to Ethereum node web3 API
+ Ethester is a command line tool which can be used to automate
+ and/or test tasks like:
+ - create new accounts;
+ - check account's balance;
+ - send ether from one account to another;
+ - deploy new contract;
+ - call contract's public and/or external methods.
