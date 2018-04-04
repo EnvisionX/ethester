@@ -14,7 +14,6 @@ and/or test tasks like:
 ## Requirements
 
 * python 2.7;
-* python-argcomplete;
 * _Ethester_ cannot work alone. Every command invocation (except for
 ``-h/--help`` option) requires running ``geth`` node and ``geth.ipc``
 socket readable and writable by current user. Last version of ``geth``

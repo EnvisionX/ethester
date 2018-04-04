@@ -9,8 +9,4 @@ test:
 	$(MAKE) -C test
 
 clean:
-	rm -f bash-completion
 	$(MAKE) -C test $@
-
-bash-completion: ethester
-	register-python-argcomplete $< > $@

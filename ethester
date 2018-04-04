@@ -5,7 +5,6 @@
 Ethester - Swiss knife for testing Ethereum smart contracts.
 """
 
-import argcomplete
 import argparse
 import json
 import logging
@@ -289,7 +288,6 @@ def parse_cmd_args():
         default=DEF_ACCOUNT_PASSWORD,
         help='password to unlock sender account')
     parser_tran.set_defaults(func=do_tran)
-    argcomplete.autocomplete(parser)
     return parser.parse_args()
 
 
