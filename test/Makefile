@@ -47,6 +47,7 @@ all: clean
 	../ethester call @run/contract Contract.number --expect 3000milli
 	! ../ethester call @run/contract Contract.number --expect 2ether
 	! ../ethester call @run/contract Contract.number --expect 2000milli
+	$(MAKE) clean
 
 clean:
 	test -f run/pid && kill -9 `cat run/pid` || true
