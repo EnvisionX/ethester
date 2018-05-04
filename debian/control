@@ -3,7 +3,7 @@ Section: utils
 Priority: extra
 Maintainer: Aleksey Morarash <aleksey.morarash@gmail.com>
 Build-Depends: debhelper, python, ethereum, solidity
-Standards-Version: 4.1.3
+Standards-Version: 4.1.4
 Homepage: https://github.com/EnvisionX/ethester
 
 Package: ethester
