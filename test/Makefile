@@ -1,5 +1,6 @@
 .PHONY: all clean
 
+export HOME = $(shell pwd)
 export ETHESTER_GETH_IPC = run/geth.ipc
 export ETHESTER_CONTRACT_PATH = run/
 export ETHESTER_LOGLEVEL = info
