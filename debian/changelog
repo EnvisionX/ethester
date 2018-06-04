@@ -1,3 +1,9 @@
+ethester (0.1.3) unstable; urgency=low
+
+  * Handle constructor absence properly
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Mon, 04 Jun 2018 22:20:43 +0300
+
 ethester (0.1.2) unstable; urgency=low
 
   * Upgrade Debian Policy version references
