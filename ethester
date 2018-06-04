@@ -800,6 +800,14 @@ def encode_method_parameters(args, abi, contract, method, parameters):
     """
     method_info = get_method_info(abi, method)
     if method_info is None:
+        if contract == method or method == '':
+            # constructor doesn't exist
+            if len(parameters) == 0:
+                return ""
+            else:
+                LOGGER.critical('there is no public constructor in %s',
+                    contract)
+                sys.exit(1)
         LOGGER.critical('there is no public method like %s.%s() in the ABI',
             contract, method if method else contract)
         sys.exit(1)
