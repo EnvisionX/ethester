@@ -48,6 +48,19 @@ all: clean
 	../ethester call @run/contract Contract.number --expect 3000milli
 	! ../ethester call @run/contract Contract.number --expect 2ether
 	! ../ethester call @run/contract Contract.number --expect 2000milli
+	../ethester tran @run/acc2 @run/contract Contract.setArray gwei
+	../ethester call @run/contract Contract.arrA --expect gwei
+	../ethester call @run/contract Contract.arrL --expect 0
+	../ethester tran @run/acc2 @run/contract Contract.setArray 2gwei 10
+	../ethester call @run/contract Contract.arrA --expect 2gwei
+	../ethester call @run/contract Contract.arrL --expect 1
+	../ethester call @run/contract Contract.getArrayElem 0 --expect 10
+	../ethester tran @run/acc2 @run/contract Contract.setArray 3gwei 5wei 6wei 7wei
+	../ethester call @run/contract Contract.arrA --expect 3gwei
+	../ethester call @run/contract Contract.arrL --expect 3
+	../ethester call @run/contract Contract.getArrayElem 0 --expect 5wei
+	../ethester call @run/contract Contract.getArrayElem 1 --expect 6wei
+	../ethester call @run/contract Contract.getArrayElem 2 --expect 7wei
 	$(MAKE) clean
 
 clean:

@@ -813,14 +813,34 @@ def encode_method_parameters(args, abi, contract, method, parameters):
         sys.exit(1)
     types = [str(i.get(u'type')) for i in method_info.get(u'inputs', [])]
     LOGGER.debug('method args: %r', types)
-    if len(types) != len(parameters):
+    if len(types) == 0:
+        # method without parameters
+        if 0 < len(parameters):
+            LOGGER.critical('%s.%s(): unexpected parameters found',
+                contract, method)
+            sys.exit(1)
+    elif types[-1].endswith('[]'):
+        # last parameter is array
+        if len(parameters) < len(types) - 1:
+            LOGGER.critical('%s.%s(%s): expected at least %r parameters'
+                ' but found %r',
+                contract, method, ','.join(types), len(types)-1, len(parameters))
+            sys.exit(1)
+    elif len(types) != len(parameters):
         LOGGER.critical('%s.%s(%s): expected %r but %r parameters found',
             contract, method, ','.join(types), len(types), len(parameters))
         sys.exit(1)
     res = []
-    for i in range(len(parameters)):
-        res.append(canonicalize_method_param(
-            resolve_arg(parameters[i]), types[i]))
+    for i in range(len(types)):
+        ptype = types[i]
+        if ptype.endswith('[]'):
+            t = ptype.strip('[]')
+            param = [canonicalize_method_param(resolve_arg(p), t)
+                    for p in parameters[i:]]
+            res.append(canonicalize_method_param(param, ptype))
+        else:
+            param = parameters[i]
+            res.append(canonicalize_method_param(resolve_arg(param), ptype))
     return ','.join(res)
 
 
@@ -845,6 +865,8 @@ def canonicalize_method_param(value, param_type):
     elif param_type in ('address', 'string'):
         if value[0] not in ('"', "'"):
             value = '"%s"' % (value,)
+    elif param_type in ('uint[]', 'uint256[]'):
+        value = '[%s]' % (','.join(value),)
     return value
 
 

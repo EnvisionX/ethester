@@ -6,6 +6,10 @@ contract Contract {
     address public addr;
     uint public number;
 
+    uint public arrA;
+    uint public arrL;
+    uint[] arrB;
+
     function Contract(string a, address b, uint c) public {
         name = a;
         addr = b;
@@ -26,5 +30,15 @@ contract Contract {
 
     function setNumber(uint a) external {
         number = a;
+    }
+
+    function setArray(uint a, uint[] b) external {
+        arrA = a;
+        arrL = b.length;
+        arrB = b;
+    }
+
+    function getArrayElem(uint i) public view returns (uint) {
+        return arrB[i];
     }
 }
