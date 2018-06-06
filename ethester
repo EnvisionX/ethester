@@ -943,7 +943,7 @@ def parse_ether(s):
     if not ss:
         return num
     if ss not in WEI_FACTORS:
-        ValueError('invalid ether amount: %r', (s,))
+        ValueError('invalid ether amount: %r' % (s,))
     return num * WEI_FACTORS[ss]
 
 
