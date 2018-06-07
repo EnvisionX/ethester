@@ -1,3 +1,11 @@
+ethester (0.2.0) unstable; urgency=low
+
+  * Gitignore geth temporary files
+  * Add support for arrays in method calls
+  * Typo fix
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Thu, 07 Jun 2018 11:26:10 +0300
+
 ethester (0.1.4) unstable; urgency=low
 
   * Fix test for pbuilder environment
