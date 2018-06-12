@@ -1,3 +1,9 @@
+ethester (0.3.0) unstable; urgency=low
+
+  * Add "events" command
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Tue, 12 Jun 2018 14:56:12 +0300
+
 ethester (0.2.0) unstable; urgency=low
 
   * Gitignore geth temporary files
