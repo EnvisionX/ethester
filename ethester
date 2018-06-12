@@ -321,6 +321,9 @@ def parse_cmd_args():
     parser_events.add_argument('--expect-le', type=parse_ether,
         help='Only for -c/--count. Execute assertion: '
         'count is equal or less than ...')
+    parser_events.add_argument('--expect-json-field',
+        type=parse_expect_json_field,
+        help='Execute assertion: JSON field value is equal to...')
     parser_events.add_argument('address', nargs='+',
         help='contract addresses')
     parser_events.set_defaults(func=do_events)
@@ -661,6 +664,19 @@ def do_events(args):
     if args.limit is not None:
         retval = retval[:args.limit]
     if not args.count:
+        if args.expect_json_field is not None:
+            (path, expected) = args.expect_json_field
+            value = get_json_field(retval, path)
+            value = json.dumps(value)
+            expected = json.dumps(expected)
+            if value != expected:
+                LOGGER.critical('assertion failed: expected '
+                    'JSON field %r value is %s but found: %s',
+                    path, expected, value)
+                sys.exit(1)
+            LOGGER.info('assertion JSON field %r = %s OK', path, expected)
+        if args.quiet:
+            sys.exit(0)
         print_json(retval, args.nice)
         sys.exit(0)
     retval = len(retval)
@@ -1248,6 +1264,54 @@ def get_password(args):
     if args.password:
         password = resolve_arg(args.password)
     return password
+
+
+def get_json_field(obj, path):
+    """
+    Fetch value from deep JSON object.
+    Throws ValueError if field is not found.
+
+    :param obj: parsed JSON object
+    :type obj: any
+
+    :param path: dot separated path to the field
+    :type path: string
+
+    :rtype: any
+    """
+    for i in path.split('.'):
+        try:
+            j = int(i)
+            if isinstance(obj, list) and 0 <= j < len(obj):
+                obj = obj[j]
+                continue
+        except ValueError:
+            if i in obj:
+                obj = obj[i]
+                continue
+        raise ValueError
+    return obj
+
+
+def parse_expect_json_field(s):
+    """
+    Parse value of --expect-json-field command line option.
+    Format of the input string must be: PATH=EXPECTED_VALUE
+    where PATH is dot separated path to a field in a deep JSON
+    object; EXPECTED_VALUE must be valid JSON value or a
+    reference to file containing valid JSON.
+    Throws ValueError on parsing error.
+
+    :param s: value, in format "path=expected"
+    :type s: string
+
+    :rtype: (json_field_path, expected_parsed_json_value)
+    """
+    s = resolve_arg(s)
+    tokens = s.split('=', 1)
+    if len(tokens) != 2 or len(tokens[0]) == '':
+        raise ValueError
+    return (tokens[0], json.loads(resolve_arg(tokens[1])))
 
 
 if __name__ == '__main__':
