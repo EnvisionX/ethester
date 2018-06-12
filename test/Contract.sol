@@ -41,4 +41,10 @@ contract Contract {
     function getArrayElem(uint i) public view returns (uint) {
         return arrB[i];
     }
+
+    function logSome(uint i, address a, uint b) external {
+        emit MyEvent(i, a, b);
+    }
+
+    event MyEvent(uint indexed, address indexed, uint);
 }

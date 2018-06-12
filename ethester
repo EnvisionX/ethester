@@ -290,6 +290,40 @@ def parse_cmd_args():
         default=DEF_ACCOUNT_PASSWORD,
         help='password to unlock sender account')
     parser_tran.set_defaults(func=do_tran)
+
+    parser_events = subparsers.add_parser('events',
+        help='read events occured')
+    parser_events.add_argument('from_block', type=parse_block_no,
+        help='read starting from block number')
+    parser_events.add_argument('to_block', type=parse_block_no,
+        help='read until block number')
+    parser_events.add_argument('--skip', type=int, default=0,
+        help='skip first records')
+    parser_events.add_argument('--limit', type=int, default=None,
+        help='limit output to given number of records')
+    parser_events.add_argument('-n', '--nice', action='store_true',
+        help='output in multiline JSON')
+    parser_events.add_argument('-c', '--count', action='store_true',
+        help='do not output events, just count them and print the amount')
+    parser_events.add_argument('-q', '--quiet', action='store_true',
+        help='Only for -c/--count. Do not print returned value')
+    parser_events.add_argument('-e', '--expect', type=parse_ether,
+        help='Only for -c/--count. Execute strict assertion')
+    parser_events.add_argument('--expect-gt', type=parse_ether,
+        help='Only for -c/--count. Execute assertion: '
+        'count is greater than ...')
+    parser_events.add_argument('--expect-ge', type=parse_ether,
+        help='Only for -c/--count. Execute assertion: '
+        'count is equal or greater than ...')
+    parser_events.add_argument('--expect-lt', type=parse_ether,
+        help='Only for -c/--count. Execute assertion: '
+        'count is less than ...')
+    parser_events.add_argument('--expect-le', type=parse_ether,
+        help='Only for -c/--count. Execute assertion: '
+        'count is equal or less than ...')
+    parser_events.add_argument('address', nargs='+',
+        help='contract addresses')
+    parser_events.set_defaults(func=do_events)
     return parser.parse_args()
 
 
@@ -585,6 +619,58 @@ def do_tran(args):
         '     gas used:   %d'
         '' % (o['block'], str(o['block_hash']), str(o['tx_hash']),
             o['gas_used']))
+
+
+def do_events(args):
+    """
+    Read occured events from the blockchain.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    if isinstance(args.from_block, int) and isinstance(args.to_block, int):
+        if args.to_block < args.from_block:
+            LOGGER.critical('to_block should be greater or '
+                'equal to from_block')
+            sys.exit(1)
+    addresses = [resolve_arg(a) for a in args.address]
+    # generate script
+    js = """
+    var b = function(s) {
+        if (s == 'latest' || s == 'pending') {
+            return s;
+        } else if (s < 0) {
+            s = eth.blockNumber + s;
+            if (s < 0) s = 0;
+        };
+        return s;
+    };
+    var f = eth.filter({
+        fromBlock: b(%r),
+        toBlock: b(%r),
+        address: %r
+    });
+    var x = f.get();
+    f.stopWatching();
+    JSON.stringify(x);
+    """ % (args.from_block, args.to_block, addresses)
+    js = js.replace('\n', '', -1)
+    retval, _ = geth_exec(args, js)
+    retval = json.loads(retval)
+    retval = retval[args.skip:]
+    if args.limit is not None:
+        retval = retval[:args.limit]
+    if not args.count:
+        print_json(retval, args.nice)
+        sys.exit(0)
+    retval = len(retval)
+    if args.expect is not None:
+        expect_equal(retval, str(args.expect), value_type='uint')
+    make_num_asserts(args, retval)
+    if args.quiet:
+        sys.exit(0)
+    args.string = False
+    exec_report(args, retval)
 
 
 def expect_equal(retval, expected, abi=None, method=None, value_type=None):
@@ -1132,6 +1218,21 @@ def parse_method(s):
     if len(a) != 2 or not a[0] or not a[1]:
         ValueError('bad method: %r' % s)
     return (a[0], a[1])
+
+
+def parse_block_no(s):
+    """
+    Parse block number.
+
+    :param s: text representation of block number.
+    :type s: string
+
+    :rtype: integer or string
+    """
+    s = resolve_arg(s).strip().lower()
+    if s in ('latest', 'pending'):
+        return s
+    return int(s)
 
 
 def get_password(args):

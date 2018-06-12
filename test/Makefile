@@ -61,6 +61,12 @@ all: clean
 	../ethester call @run/contract Contract.getArrayElem 0 --expect 5wei
 	../ethester call @run/contract Contract.getArrayElem 1 --expect 6wei
 	../ethester call @run/contract Contract.getArrayElem 2 --expect 7wei
+# test events API
+	../ethester tran @run/acc2 @run/contract Contract.logSome 1 @run/acc2 3
+	../ethester events -10 latest @run/contract --nice
+	../ethester events 0 latest @run/contract --count --expect 1 --quiet
+	../ethester events 0 latest @run/contract --count --expect 0 --skip 1 --quiet
+	../ethester events 0 latest @run/contract --count --expect 0 --limit 0 --quiet
 	$(MAKE) clean
 
 clean:
