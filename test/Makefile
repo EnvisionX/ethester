@@ -65,12 +65,19 @@ all: clean
 	../ethester tran @run/acc2 @run/contract Contract.logSome 1 @run/acc2 3
 	../ethester events -10 latest @run/contract --nice
 	../ethester events 0 latest @run/contract --quiet --expect 1
+	../ethester events 0 latest @run/contract --quiet --expect-ge 1
+	../ethester events 0 latest @run/contract --quiet --expect-ge 0
+	../ethester events 0 latest @run/contract --quiet --expect-gt 0
+	../ethester events 0 latest @run/contract --quiet --expect-le 1
+	../ethester events 0 latest @run/contract --quiet --expect-le 2
+	../ethester events 0 latest @run/contract --quiet --expect-lt 2
 	../ethester events 0 latest @run/contract --quiet --expect 0 --skip 1
 	../ethester events 0 latest @run/contract --quiet --expect 0 --limit 0
 	../ethester events 0 latest @run/contract --field 0.topics.0 > run/topic.json
 	../ethester events 0 latest @run/contract --quiet --expect-json-field 0.topics.0=@run/topic.json
 	../ethester events 0 latest @run/contract --event Contract.MyEvent --quiet --expect 1
 	../ethester events 0 latest @run/contract --event Contract.MyEvent2 --quiet --expect 0
+	! ../ethester events 0 latest @run/contract --event Contract.MyEvent3
 	$(MAKE) clean
 
 clean:

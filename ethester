@@ -687,39 +687,39 @@ def do_events(args):
     JSON.stringify(x);
     """ % (args.from_block, args.to_block, addresses, topics)
     js = js.replace('\n', '', -1)
+    # read events
     retval, _ = geth_exec(args, js)
     retval = json.loads(retval)
     retval = retval[args.skip:]
     if args.limit is not None:
         retval = retval[:args.limit]
-    if not args.count:
-        if args.expect_json_field is not None:
-            (path, expected) = args.expect_json_field
-            value = get_json_field(retval, path)
-            value = json.dumps(value)
-            expected = json.dumps(expected)
-            if value != expected:
-                LOGGER.critical('assertion failed: expected '
-                    'JSON field %r value is %s but found: %s',
-                    path, expected, value)
-                sys.exit(1)
-            LOGGER.info('assertion JSON field %r = %s OK', path, expected)
-        if args.quiet:
-            sys.exit(0)
-        if args.field is not None:
-            LOGGER.debug('Output only %r field', args.field)
-            retval = get_json_field(retval, args.field)
-        exec_report(args, retval)
-        sys.exit(0)
+    # check expectations
     if args.expect is not None:
         expect_equal(len(retval), str(args.expect), value_type='uint')
     make_num_asserts(args, len(retval))
+    if args.expect_json_field is not None:
+        (path, expected) = args.expect_json_field
+        value = get_json_field(retval, path)
+        value = json.dumps(value)
+        expected = json.dumps(expected)
+        if value != expected:
+            LOGGER.critical('assertion failed: expected '
+                'JSON field %r value is %s but found: %s',
+                path, expected, value)
+            sys.exit(1)
+        LOGGER.info('assertion JSON field %r = %s OK', path, expected)
     if args.quiet:
         sys.exit(0)
-    args.string = False
+    # output
     if args.count:
+        args.string = False
         exec_report(args, len(retval))
+    elif args.field is not None:
+        LOGGER.debug('Output only %r field', args.field)
+        retval = get_json_field(retval, args.field)
+        exec_report(args, retval)
     else:
+        args.string = False
         exec_report(args, retval)
 
 
