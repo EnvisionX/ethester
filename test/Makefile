@@ -64,9 +64,9 @@ all: clean
 # test events API
 	../ethester tran @run/acc2 @run/contract Contract.logSome 1 @run/acc2 3
 	../ethester events -10 latest @run/contract --nice
-	../ethester events 0 latest @run/contract --count --expect 1 --quiet
-	../ethester events 0 latest @run/contract --count --expect 0 --skip 1 --quiet
-	../ethester events 0 latest @run/contract --count --expect 0 --limit 0 --quiet
+	../ethester events 0 latest @run/contract --quiet --expect 1
+	../ethester events 0 latest @run/contract --quiet --expect 0 --skip 1
+	../ethester events 0 latest @run/contract --quiet --expect 0 --limit 0
 	../ethester events 0 latest @run/contract --field 0.topics.0 > run/topic.json
 	../ethester events 0 latest @run/contract --quiet --expect-json-field 0.topics.0=@run/topic.json
 	$(MAKE) clean

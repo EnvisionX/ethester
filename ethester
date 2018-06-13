@@ -311,21 +311,21 @@ def parse_cmd_args():
     parser_events.add_argument('-c', '--count', action='store_true',
         help='do not output events, just count them and print the amount')
     parser_events.add_argument('-q', '--quiet', action='store_true',
-        help='Only for -c/--count. Do not print returned value')
+        help='Do not print returned value')
     parser_events.add_argument('-e', '--expect', type=parse_ether,
-        help='Only for -c/--count. Execute strict assertion')
+        help='Execute strict assertion of events count')
     parser_events.add_argument('--expect-gt', type=parse_ether,
-        help='Only for -c/--count. Execute assertion: '
-        'count is greater than ...')
+        help='Execute assertion: '
+        'events count is greater than ...')
     parser_events.add_argument('--expect-ge', type=parse_ether,
-        help='Only for -c/--count. Execute assertion: '
-        'count is equal or greater than ...')
+        help='Execute assertion: '
+        'events count is equal or greater than ...')
     parser_events.add_argument('--expect-lt', type=parse_ether,
-        help='Only for -c/--count. Execute assertion: '
-        'count is less than ...')
+        help='Execute assertion: '
+        'events count is less than ...')
     parser_events.add_argument('--expect-le', type=parse_ether,
-        help='Only for -c/--count. Execute assertion: '
-        'count is equal or less than ...')
+        help='Execute assertion: '
+        'events count is equal or less than ...')
     parser_events.add_argument('--expect-json-field',
         type=parse_expect_json_field,
         help='Execute assertion: JSON field value is equal to...')
@@ -644,6 +644,12 @@ def do_events(args):
     if args.string and args.field is None:
         LOGGER.warning('--field is not set but --string is '
             'set - it will be ignored')
+    if args.nice and args.count:
+        LOGGER.critical('-n/--nice and -c/--count are mutually exclusive')
+        sys.exit(1)
+    if args.count and args.nice:
+        LOGGER.warning('-c/--count is set but -n/--nice is used '
+            '- it will be ignored')
     addresses = [resolve_arg(a) for a in args.address]
     # generate script
     js = """
@@ -690,14 +696,16 @@ def do_events(args):
             retval = get_json_field(retval, args.field)
         exec_report(args, retval)
         sys.exit(0)
-    retval = len(retval)
     if args.expect is not None:
-        expect_equal(retval, str(args.expect), value_type='uint')
-    make_num_asserts(args, retval)
+        expect_equal(len(retval), str(args.expect), value_type='uint')
+    make_num_asserts(args, len(retval))
     if args.quiet:
         sys.exit(0)
     args.string = False
-    exec_report(args, retval)
+    if args.count:
+        exec_report(args, len(retval))
+    else:
+        exec_report(args, retval)
 
 
 def expect_equal(retval, expected, abi=None, method=None, value_type=None):
