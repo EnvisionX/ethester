@@ -69,6 +69,8 @@ all: clean
 	../ethester events 0 latest @run/contract --quiet --expect 0 --limit 0
 	../ethester events 0 latest @run/contract --field 0.topics.0 > run/topic.json
 	../ethester events 0 latest @run/contract --quiet --expect-json-field 0.topics.0=@run/topic.json
+	../ethester events 0 latest @run/contract --event Contract.MyEvent --quiet --expect 1
+	../ethester events 0 latest @run/contract --event Contract.MyEvent2 --quiet --expect 0
 	$(MAKE) clean
 
 clean:

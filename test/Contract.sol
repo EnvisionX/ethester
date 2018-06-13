@@ -47,4 +47,5 @@ contract Contract {
     }
 
     event MyEvent(uint indexed, address indexed, uint);
+    event MyEvent2();
 }

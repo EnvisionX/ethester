@@ -301,6 +301,9 @@ def parse_cmd_args():
         help='skip first records')
     parser_events.add_argument('--limit', type=int, default=None,
         help='limit output to given number of records')
+    parser_events.add_argument('--event', type=parse_event_name,
+        help='search only this type of events.'
+        ' Format is ContractName.EventName')
     parser_events.add_argument('-n', '--nice', action='store_true',
         help='Only for JSON output format. Use multiline JSON with indents')
     parser_events.add_argument('--field',
@@ -651,6 +654,18 @@ def do_events(args):
         LOGGER.warning('-c/--count is set but -n/--nice is used '
             '- it will be ignored')
     addresses = [resolve_arg(a) for a in args.address]
+    topics = ''
+    if args.event is not None:
+        contract, event = args.event
+        abi = read_contract_abi(args, contract)
+        info = get_event_info(abi, event)
+        if info is None:
+            LOGGER.critical('Event %s.%s is not found in ABI',
+                contract, event)
+            sys.exit(1)
+        event_args = ','.join([str(a.get(u'type', ''))
+                               for a in info.get(u'inputs', [])])
+        topics = ",topics: [web3.sha3('%s(%s)')]" % (event, event_args)
     # generate script
     js = """
     var b = function(s) {
@@ -665,12 +680,12 @@ def do_events(args):
     var f = eth.filter({
         fromBlock: b(%r),
         toBlock: b(%r),
-        address: %r
+        address: %r%s
     });
     var x = f.get();
     f.stopWatching();
     JSON.stringify(x);
-    """ % (args.from_block, args.to_block, addresses)
+    """ % (args.from_block, args.to_block, addresses, topics)
     js = js.replace('\n', '', -1)
     retval, _ = geth_exec(args, js)
     retval = json.loads(retval)
@@ -1012,6 +1027,25 @@ def get_method_info(abi, method=None):
                 return entry
 
 
+def get_event_info(abi, event):
+    """
+    Lookup for event info in contract ABI.
+
+    :param abi: contract ABI (parsed JSON)
+    :type abi: list of dicts
+
+    :param method: event name
+    :type method: string
+
+    :rtype: dict or NoneType
+    """
+    for entry in abi:
+        if entry.get(u'type', '') != u'event':
+            continue
+        if str(entry.get(u'name', '')) == event:
+            return entry
+
+
 def dump_hook(args, tx_type, obj, script):
     """
     If configured with --dump-dir, will write JavaScript
@@ -1252,6 +1286,21 @@ def parse_method(s):
     a = resolve_arg(s).split('.')
     if len(a) != 2 or not a[0] or not a[1]:
         ValueError('bad method: %r' % s)
+    return (a[0], a[1])
+
+
+def parse_event_name(s):
+    """
+    Parse contract and event name.
+
+    :param s: name in format ContractName.EventName
+    :type s: string
+
+    :rtype: (string, string)
+    """
+    a = resolve_arg(s).split('.')
+    if len(a) != 2 or not a[0] or not a[1]:
+        ValueError('bad event: %r' % s)
     return (a[0], a[1])
 
 
