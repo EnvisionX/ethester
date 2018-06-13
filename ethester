@@ -302,7 +302,12 @@ def parse_cmd_args():
     parser_events.add_argument('--limit', type=int, default=None,
         help='limit output to given number of records')
     parser_events.add_argument('-n', '--nice', action='store_true',
-        help='output in multiline JSON')
+        help='Only for JSON output format. Use multiline JSON with indents')
+    parser_events.add_argument('--field',
+        help='Only for JSON output format. Output only given field.')
+    parser_events.add_argument('-s', '--string', action='store_true',
+        help='Only for --field option. Treat returned value as string'
+        ' and print it as plain text instead of JSON-encoded string')
     parser_events.add_argument('-c', '--count', action='store_true',
         help='do not output events, just count them and print the amount')
     parser_events.add_argument('-q', '--quiet', action='store_true',
@@ -636,6 +641,9 @@ def do_events(args):
             LOGGER.critical('to_block should be greater or '
                 'equal to from_block')
             sys.exit(1)
+    if args.string and args.field is None:
+        LOGGER.warning('--field is not set but --string is '
+            'set - it will be ignored')
     addresses = [resolve_arg(a) for a in args.address]
     # generate script
     js = """
@@ -677,7 +685,10 @@ def do_events(args):
             LOGGER.info('assertion JSON field %r = %s OK', path, expected)
         if args.quiet:
             sys.exit(0)
-        print_json(retval, args.nice)
+        if args.field is not None:
+            LOGGER.debug('Output only %r field', args.field)
+            retval = get_json_field(retval, args.field)
+        exec_report(args, retval)
         sys.exit(0)
     retval = len(retval)
     if args.expect is not None:
