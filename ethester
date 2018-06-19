@@ -6,6 +6,7 @@ Ethester - Swiss knife for testing Ethereum smart contracts.
 """
 
 import argparse
+import binascii
 import json
 import logging
 import os
@@ -290,6 +291,18 @@ def parse_cmd_args():
         default=DEF_ACCOUNT_PASSWORD,
         help='password to unlock sender account')
     parser_tran.set_defaults(func=do_tran)
+
+    parser_get_code = subparsers.add_parser('get-code',
+        help='get smart contract code')
+    parser_get_code.add_argument('address',
+        help='deployed smart contract address')
+    parser_get_code.add_argument('--hex', action='store_true',
+        help='output in hex')
+    parser_get_code.add_argument('-j', '--json', action='store_true',
+        help='output as json')
+    parser_get_code.add_argument('-b', '--bin', action='store_true',
+        help='output as binary')
+    parser_get_code.set_defaults(func=do_get_code)
 
     parser_events = subparsers.add_parser('events',
         help='read events occured')
@@ -630,6 +643,31 @@ def do_tran(args):
         '     gas used:   %d'
         '' % (o['block'], str(o['block_hash']), str(o['tx_hash']),
             o['gas_used']))
+
+
+def do_get_code(args):
+    """
+    Fetch smart contract code and print it to the stdout.
+
+    :param args: parsed command line args for ethester.
+    :type args: namespace
+    """
+    addr = resolve_arg(args.address)
+    js = "JSON.stringify(eth.getCode('%s'));" % (addr,)
+    retval, _ = geth_exec(args, js)
+    retval = str(json.loads(retval))
+    if retval == '0x':
+        LOGGER.critical('No smart contract found at %s', addr)
+        sys.exit(1)
+    if args.hex:
+        sys.stdout.write(retval[2:])
+    elif args.json:
+        json.dump(retval, sys.stdout)
+        sys.stdout.write('\n')
+    elif args.bin:
+        sys.stdout.write(binascii.unhexlify(retval[2:]))
+    else:
+        sys.stdout.write(retval[2:] + '\n')
 
 
 def do_events(args):
