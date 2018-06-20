@@ -1,3 +1,14 @@
+ethester (0.4.0) unstable; urgency=low
+
+  * Implement get-code command
+  * Fix event expectation check logic
+  * Extend events command with --event option
+  * Make events options more user friendly
+  * Extend events command with --field option
+  * Extend events command with --expect-json-field assertion
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Wed, 20 Jun 2018 15:10:20 +0300
+
 ethester (0.3.0) unstable; urgency=low
 
   * Add "events" command
