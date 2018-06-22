@@ -459,29 +459,15 @@ def do_deploy(args):
         if (txRcp != null) break;
     };
     if (txRcp == null) { throw 'error: timeout'; };
-    JSON.stringify({
-        block: txRcp.blockNumber,
-        block_hash: txRcp.blockHash,
-        tx_hash: txRcp.transactionHash,
-        gas_used: txRcp.gasUsed,
-        address: txRcp.contractAddress
-    });
+    JSON.stringify(txRcp);
     """ % (sender, password,
         abi, cargs, sender, price_to_js(gas_limit),
         price_to_js(gas_price), bytecode, get_tx_timeout(args))
     dump_hook(args, 'deploy', contract, js)
-    js = js.replace('\n', '', -1)
-    retval, _ = geth_exec(args, js)
-    o = json.loads(retval)
-    LOGGER.info('transaction info:\n'
-        '     block:      %d\n'
-        '     block hash: %s\n'
-        '     tx hash:    %s\n'
-        '     gas used:   %d\n'
-        '     address:    %s'
-        '' % (o['block'], str(o['block_hash']), str(o['tx_hash']),
-            o['gas_used'], str(o['address'])))
-    exec_report(args, o['address'])
+    retval, _ = geth_exec(args, js.replace('\n', '', -1))
+    retval = json.loads(retval)
+    printTransactionReceipt(retval)
+    exec_report(args, retval['contractAddress'])
 
 
 def do_call(args):
@@ -560,26 +546,13 @@ def do_send(args):
         if (txRcp != null) break;
     };
     if (txRcp == null) { throw 'error: timeout'; };
-    JSON.stringify({
-        block: txRcp.blockNumber,
-        block_hash: txRcp.blockHash,
-        tx_hash: txRcp.transactionHash,
-        gas_used: txRcp.gasUsed,
-    });
+    JSON.stringify(txRcp);
     """ % (sender, password, sender, receiver,
         price_to_js(gas_limit), price_to_js(gas_price),
         price_to_js(args.value), data, get_tx_timeout(args))
     dump_hook(args, 'transfer', '%s-%s' % (sender, receiver), js)
-    js = js.replace('\n', '', -1)
-    retval, _ = geth_exec(args, js)
-    o = json.loads(retval)
-    LOGGER.info('transaction info:\n'
-        '     block:      %d\n'
-        '     block hash: %s\n'
-        '     tx hash:    %s\n'
-        '     gas used:   %d'
-        '' % (o['block'], str(o['block_hash']), str(o['tx_hash']),
-            o['gas_used']))
+    retval, _ = geth_exec(args, js.replace('\n', '', -1))
+    printTransactionReceipt(json.loads(retval))
 
 
 def do_tran(args):
@@ -623,26 +596,38 @@ def do_tran(args):
         if (txRcp != null) break;
     };
     if (txRcp == null) { throw 'error: timeout'; };
-    JSON.stringify({
-        block: txRcp.blockNumber,
-        block_hash: txRcp.blockHash,
-        tx_hash: txRcp.transactionHash,
-        gas_used: txRcp.gasUsed,
-    });
+    JSON.stringify(txRcp);
     """ % (sender, password, abi, receiver, method, cargs,
         sender, price_to_js(gas_limit), price_to_js(gas_price),
         price_to_js(args.value), get_tx_timeout(args))
     dump_hook(args, 'tran', '%s.%s' % (contract, method), js)
-    js = js.replace('\n', '', -1)
-    retval, _ = geth_exec(args, js)
-    o = json.loads(retval)
+    retval, _ = geth_exec(args, js.replace('\n', '', -1))
+    printTransactionReceipt(json.loads(retval))
+
+
+def printTransactionReceipt(rcp):
+    """
+    Log transaction receipt object.
+
+    :param rcp: transaction receipt object
+    :type rcp: dict
+    """
+    if not LOGGER.isEnabledFor(20):
+        return
+    addr = ''
+    if rcp['contractAddress']:
+        addr = '\n     address:    %s' % rcp['contractAddress']
     LOGGER.info('transaction info:\n'
         '     block:      %d\n'
         '     block hash: %s\n'
         '     tx hash:    %s\n'
-        '     gas used:   %d'
-        '' % (o['block'], str(o['block_hash']), str(o['tx_hash']),
-            o['gas_used']))
+        '     gas used:   %d\n'
+        '     status:     %s - %s%s'
+        '' % (rcp['blockNumber'], str(rcp['blockHash']),
+            str(rcp['transactionHash']),
+            rcp['gasUsed'], rcp['status'],
+            'OK' if rcp['status'] == '0x1' else 'REVERTED',
+            addr))
 
 
 def do_get_code(args):

@@ -32,6 +32,11 @@ contract Contract {
         number = a;
     }
 
+    function setNumberRevert(uint a) external {
+        number = a;
+        revert();
+    }
+
     function setArray(uint a, uint[] b) external {
         arrA = a;
         arrL = b.length;
