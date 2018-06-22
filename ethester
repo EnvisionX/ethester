@@ -1006,16 +1006,34 @@ def encode_method_parameters(args, abi, contract, method, parameters):
         sys.exit(1)
     res = []
     for i in range(len(types)):
-        ptype = types[i]
-        if ptype.endswith('[]'):
-            t = ptype.strip('[]')
-            param = [canonicalize_method_param(resolve_arg(p), t)
-                    for p in parameters[i:]]
-            res.append(canonicalize_method_param(param, ptype))
+        if types[i].endswith('[]'):
+            res.append(paramToJSON(parameters[i:], types[i]))
         else:
-            param = parameters[i]
-            res.append(canonicalize_method_param(resolve_arg(param), ptype))
+            res.append(paramToJSON(parameters[i], types[i]))
     return ','.join(res)
+
+
+def paramToJSON(value, ptype):
+    """
+    Generate JavaScript list of method/constructor arguments.
+
+    :param value: raw param value (e.g. as passed to cmd)
+    :type value: string or array of strings
+
+    :param ptype: solidity type name
+    :type ptype: string
+
+    :rtype: string
+    """
+    if isinstance(value, list):
+        return '[%s]' % ','.join([paramToJSON(e, ptype) for e in value])
+    value = resolve_arg(value)
+    if ptype.startswith('uint') or ptype.startswith('int'):
+        value = 'new BigNumber("%d")' % parse_ether(value)
+    elif ptype in ('address', 'string'):
+        if value[0] not in ('"', "'"):
+            value = '"%s"' % value
+    return value
 
 
 def canonicalize_method_param(value, param_type):

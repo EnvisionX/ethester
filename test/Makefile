@@ -48,6 +48,8 @@ all: clean
 	../ethester call @run/contract Contract.number --expect 3000milli
 	! ../ethester call @run/contract Contract.number --expect 2ether
 	! ../ethester call @run/contract Contract.number --expect 2000milli
+	../ethester tran @run/acc2 @run/contract Contract.setNumber 123456789012345678901234567890
+	../ethester call @run/contract Contract.number --expect 123456789012345678901234567890
 	../ethester tran @run/acc2 @run/contract Contract.setArray gwei
 	../ethester call @run/contract Contract.arrA --expect gwei
 	../ethester call @run/contract Contract.arrL --expect 0
