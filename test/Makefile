@@ -65,6 +65,22 @@ all: clean
 	../ethester call @run/contract Contract.getArrayElem 0 --expect 5wei
 	../ethester call @run/contract Contract.getArrayElem 1 --expect 6wei
 	../ethester call @run/contract Contract.getArrayElem 2 --expect 7wei
+	../ethester tran @run/acc2 @run/contract Contract.setArray 0 \
+		1234567890123456789012345678901234567890123456789 \
+		2345678901234567890123456789012345678901234567890 \
+		3456789012345678901234567890123456789012345678901
+	../ethester call @run/contract Contract.getArray \
+		--expect-json-field 0=1234567890123456789012345678901234567890123456789
+	! ../ethester call @run/contract Contract.getArray \
+		--expect-json-field 0=12345678901234567890123456789012345678901234567890
+	../ethester call @run/contract Contract.getArray \
+		--expect-json-field 1=2345678901234567890123456789012345678901234567890
+	! ../ethester call @run/contract Contract.getArray \
+		--expect-json-field 1=23456789012345678901234567890123456789012345678901
+	../ethester call @run/contract Contract.getArray \
+		--expect-json-field 2=3456789012345678901234567890123456789012345678901
+	! ../ethester call @run/contract Contract.getArray \
+		--expect-json-field 2=34567890123456789012345678901234567890123456789012
 # test events API
 	../ethester tran @run/acc2 @run/contract Contract.logSome 1 @run/acc2 3
 	../ethester events -10 latest @run/contract --nice

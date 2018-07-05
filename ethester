@@ -256,6 +256,9 @@ def parse_cmd_args():
     parser_call.add_argument('--expect-le', type=parse_ether,
         help='execute assertion: value is equal or less than N.'
         ' Applied only when number returned.')
+    parser_call.add_argument('--expect-json-field',
+        type=parse_expect_json_field,
+        help='Execute assertion: JSON field value is equal to...')
     parser_call.set_defaults(func=do_call)
 
     parser_send = subparsers.add_parser('send',
@@ -514,6 +517,17 @@ def do_call(args):
         retval, _ = geth_exec(args, js.replace('\n', '', -1))
         retval = json.loads(retval)
         LOGGER.debug('decoded JSON: %r', retval)
+    if args.expect_json_field is not None:
+        (path, expected) = args.expect_json_field
+        value = get_json_field(retval, path)
+        value = json.dumps(value)
+        expected = json.dumps(expected)
+        if value != expected:
+            LOGGER.critical('assertion failed: expected '
+                'JSON field %r value is %s but found: %s',
+                path, expected, value)
+            sys.exit(1)
+        LOGGER.info('assertion JSON field %r = %s OK', path, expected)
     if args.expect:
         expect_equal(retval, resolve_arg(args.expect), abi_json, method)
     if rettype is not None and 'int' in rettype:

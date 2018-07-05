@@ -43,6 +43,10 @@ contract Contract {
         arrB = b;
     }
 
+    function getArray() public view returns (uint[]) {
+        return arrB;
+    }
+
     function getArrayElem(uint i) public view returns (uint) {
         return arrB[i];
     }
