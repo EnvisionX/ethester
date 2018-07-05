@@ -1,3 +1,10 @@
+ethester (0.6.0) unstable; urgency=low
+
+  * Add --expect-json-field option for "call" command
+  * Fix cases when call returns array of ints
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Thu, 05 Jul 2018 18:11:10 +0300
+
 ethester (0.5.0) unstable; urgency=low
 
   * Improve transaction reporting
