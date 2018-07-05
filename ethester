@@ -487,18 +487,33 @@ def do_call(args):
     cargs = encode_method_parameters(args, abi_json,
         contract, method, args.parameter)
     rettype = get_method_ret_type(abi_json, method)
-    if rettype is not None and 'int' in rettype:
+    retval = None
+    if rettype is not None:
         LOGGER.debug('rettype=%r', rettype)
-        js = "eth.contract(%s).at('%s').%s(%s).toString(10);" % (abi,
-            resolve_arg(args.contract_address),
-            resolve_arg(method), cargs)
-        retval, _ = geth_exec(args, js)
-        retval = int(retval)
-    else:
-        js = "eth.contract(%s).at('%s').%s(%s);" % (abi,
-            resolve_arg(args.contract_address),
-            resolve_arg(method), cargs)
-        retval, _ = geth_exec(args, js)
+        js = """
+        function fmt(v) {
+            if (v instanceof BigNumber) {
+                return v.toString(10);
+            }else{
+                return JSON.stringify(v);
+            }
+        };
+        var res = eth.contract(%s).at('%s').%s(%s);
+        if (res instanceof Array) {
+            var s = "";
+            for (i=0; i<res.length; i++) {
+                if (s) { s += ","; }
+                s += fmt(res[i]);
+            }
+            "[" + s + "]";
+        }else{
+            fmt(res);
+        };
+        """ % (abi, resolve_arg(args.contract_address),
+               resolve_arg(method), cargs)
+        retval, _ = geth_exec(args, js.replace('\n', '', -1))
+        retval = json.loads(retval)
+        LOGGER.debug('decoded JSON: %r', retval)
     if args.expect:
         expect_equal(retval, resolve_arg(args.expect), abi_json, method)
     if rettype is not None and 'int' in rettype:
