@@ -490,33 +490,48 @@ def do_call(args):
     cargs = encode_method_parameters(args, abi_json,
         contract, method, args.parameter)
     rettype = get_method_ret_type(abi_json, method)
+    LOGGER.debug('rettype=%r', rettype)
+    if rettype is None:
+        LOGGER.critical("method %s.%s() doesn't exist",
+            contract, method)
+        sys.exit(1)
     retval = None
-    if rettype is not None:
-        LOGGER.debug('rettype=%r', rettype)
+    if len(rettype) == 0:
+        LOGGER.warning("method %s.%s() returns nothing",
+            contract, method)
+    else:
         js = """
         function fmt(v) {
-            if (v instanceof BigNumber) {
+            if (v instanceof Array) {
+                var s = "";
+                for (var i = 0; i < v.length; i++) {
+                    if (s) { s += ","; };
+                    s += fmt(v[i]);
+                }
+                return "[" + s + "]";
+            } else if (v instanceof BigNumber) {
                 return v.toString(10);
-            }else{
+            } else {
                 return JSON.stringify(v);
             }
         };
-        var res = eth.contract(%s).at('%s').%s(%s);
-        if (res instanceof Array) {
-            var s = "";
-            for (i=0; i<res.length; i++) {
-                if (s) { s += ","; }
-                s += fmt(res[i]);
-            }
-            "[" + s + "]";
-        }else{
-            fmt(res);
-        };
+        var res = fmt(eth.contract(%s).at('%s').%s(%s));
+        if (%d == 1) res = "[" + res + "]";
+        res;
         """ % (abi, resolve_arg(args.contract_address),
-               resolve_arg(method), cargs)
+               resolve_arg(method), cargs, len(rettype))
         retval, _ = geth_exec(args, js.replace('\n', '', -1))
         retval = json.loads(retval)
         LOGGER.debug('decoded JSON: %r', retval)
+    if len(rettype) == 1:
+        retval = retval[0]
+        if args.expect:
+            expect_equal(retval, resolve_arg(args.expect), abi_json, method)
+        if 'int' in rettype[0]:
+            make_num_asserts(args, retval)
+        elif args.expect_gt or args.expect_ge or args.expect_lt or args.expect_le:
+            LOGGER.critical('cannot apply greater/less assertions to %r', retval)
+            sys.exit(1)
     if args.expect_json_field is not None:
         (path, expected) = args.expect_json_field
         value = get_json_field(retval, path)
@@ -528,13 +543,6 @@ def do_call(args):
                 path, expected, value)
             sys.exit(1)
         LOGGER.info('assertion JSON field %r = %s OK', path, expected)
-    if args.expect:
-        expect_equal(retval, resolve_arg(args.expect), abi_json, method)
-    if rettype is not None and 'int' in rettype:
-        make_num_asserts(args, retval)
-    elif args.expect_gt or args.expect_ge or args.expect_lt or args.expect_le:
-        LOGGER.critical('cannot apply greater/less assertions to %r', retval)
-        sys.exit(1)
     if not args.quiet:
         exec_report(args, retval)
 
@@ -868,15 +876,12 @@ def get_method_ret_type(abi, method):
     :param method: called contract method name
     :type method: string
 
-    :rtype: string or NoneType
+    :rtype: list of strings or None
     """
     method_info = get_method_info(abi, method)
     if method_info is None:
         return None
-    types = [str(i[u'type']) for i in method_info.get(u'outputs', [])]
-    if len(types) == 1:
-        return types[0]
-    return None
+    return [str(i[u'type']) for i in method_info.get(u'outputs', [])]
 
 
 def price_to_js(wei):

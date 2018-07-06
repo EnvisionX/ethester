@@ -81,6 +81,16 @@ all: clean
 		--expect-json-field 2=3456789012345678901234567890123456789012345678901
 	! ../ethester call @run/contract Contract.getArray \
 		--expect-json-field 2=34567890123456789012345678901234567890123456789012
+	../ethester call @run/contract Contract.getAll \
+		--expect-json-field 0=0
+	../ethester call @run/contract Contract.getAll \
+		--expect-json-field 1=3
+	../ethester call @run/contract Contract.getAll \
+		--expect-json-field 2.0=1234567890123456789012345678901234567890123456789
+	../ethester call @run/contract Contract.getAll \
+		--expect-json-field 2.1=2345678901234567890123456789012345678901234567890
+	../ethester call @run/contract Contract.getAll \
+		--expect-json-field 2.2=3456789012345678901234567890123456789012345678901
 # test events API
 	../ethester tran @run/acc2 @run/contract Contract.logSome 1 @run/acc2 3
 	../ethester events -10 latest @run/contract --nice

@@ -51,6 +51,10 @@ contract Contract {
         return arrB[i];
     }
 
+    function getAll() public view returns (uint, uint, uint[]) {
+        return (arrA, arrL, arrB);
+    }
+
     function logSome(uint i, address a, uint b) external {
         emit MyEvent(i, a, b);
     }
