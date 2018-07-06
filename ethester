@@ -533,7 +533,7 @@ def do_call(args):
     if rettype is not None and 'int' in rettype:
         make_num_asserts(args, retval)
     elif args.expect_gt or args.expect_ge or args.expect_lt or args.expect_le:
-        LOGGER.critical('cannot apply gerater/less assertions to %r', retval)
+        LOGGER.critical('cannot apply greater/less assertions to %r', retval)
         sys.exit(1)
     if not args.quiet:
         exec_report(args, retval)
