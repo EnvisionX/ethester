@@ -1427,7 +1427,7 @@ def get_json_field(obj, path):
             if i in obj:
                 obj = obj[i]
                 continue
-        raise ValueError
+        raise ValueError('get_json_field: no index %r in object %r' % (i, obj))
     return obj
 
 
