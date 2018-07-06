@@ -1,3 +1,11 @@
+ethester (0.6.1) unstable; urgency=low
+
+  * Add support for multiple return values in 'call' command
+  * Make error report more informative
+  * Fix misprint
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Fri, 06 Jul 2018 12:03:05 +0300
+
 ethester (0.6.0) unstable; urgency=low
 
   * Add --expect-json-field option for "call" command
