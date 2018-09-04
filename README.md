@@ -7,9 +7,15 @@ and/or test tasks like:
 
 * create new accounts;
 * check account's balance;
+* list all available accounts;
 * send ether from one account to another;
 * deploy new contract;
-* call contract's public and/or external methods.
+* call contract's public and/or external methods;
+* get smart contract byte code from the blockchain;
+* fetch logs from the blockchain;
+* execute custom JavaScript code on a Geth node.
+
+Full documentation available in the [doc/ subdirectory](doc/README.md).
 
 ## Requirements
 
