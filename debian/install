@@ -1,2 +1,2 @@
 ethester /usr/bin
-doc/*.md /usr/share/doc/ethester
+doc/*.md /usr/share/doc/ethester/doc
