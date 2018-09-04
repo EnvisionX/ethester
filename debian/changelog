@@ -1,3 +1,12 @@
+ethester (0.7.0) unstable; urgency=low
+
+  * Update index readme page, package description
+  * Write the documentation and usage examples
+  * Add --write-receipt command line option
+  * Update TODO
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Tue, 04 Sep 2018 15:34:48 +0300
+
 ethester (0.6.1) unstable; urgency=low
 
   * Add support for multiple return values in 'call' command
