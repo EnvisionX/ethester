@@ -11,6 +11,7 @@ contract Contract {
     uint[] arrB;
 
     function Contract(string a, address b, uint c) public {
+        require(c != 99);
         name = a;
         addr = b;
         number = c;
@@ -29,6 +30,7 @@ contract Contract {
     }
 
     function setNumber(uint a) external {
+        require(a != 99);
         number = a;
     }
 

@@ -21,7 +21,9 @@ all: clean
 	../ethester balance @run/acc2 --expect 0
 	../ethester send @run/acc1 @run/acc2 10ether
 	../ethester balance @run/acc2 --expect 10ether
+	! ../ethester deploy @run/acc2 Contract str1 @run/acc1 99
 	../ethester deploy @run/acc2 Contract str1 @run/acc1 2ether -s > run/contract
+	! ../ethester send @run/acc1 @run/contract ether
 	../ethester call @run/contract Contract.name --expect str1
 	! ../ethester call @run/contract Contract.name --expect str2
 	../ethester call @run/contract Contract.addr --expect @run/acc1
@@ -43,6 +45,8 @@ all: clean
 	../ethester tran @run/acc2 @run/contract Contract.setAddr @run/acc2
 	../ethester call @run/contract Contract.addr --expect @run/acc2
 	! ../ethester call @run/contract Contract.addr --expect @run/acc1
+	! ../ethester tran @run/acc2 @run/contract Contract.setNumber 99
+	../ethester call @run/contract Contract.number --expect 2ether
 	../ethester tran @run/acc2 @run/contract Contract.setNumber 3ether
 	../ethester call @run/contract Contract.number --expect 3ether
 	../ethester call @run/contract Contract.number --expect 3000milli
@@ -50,7 +54,7 @@ all: clean
 	! ../ethester call @run/contract Contract.number --expect 2000milli
 	../ethester tran @run/acc2 @run/contract Contract.setNumber 123456789012345678901234567890
 	../ethester call @run/contract Contract.number --expect 123456789012345678901234567890
-	../ethester tran @run/acc2 @run/contract Contract.setNumberRevert 123
+	../ethester tran --ignore-revert @run/acc2 @run/contract Contract.setNumberRevert 123
 	../ethester call @run/contract Contract.number --expect 123456789012345678901234567890
 	../ethester tran @run/acc2 @run/contract Contract.setArray gwei
 	../ethester call @run/contract Contract.arrA --expect gwei

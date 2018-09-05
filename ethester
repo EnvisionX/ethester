@@ -210,6 +210,8 @@ def parse_cmd_args():
 
     parser_deploy = subparsers.add_parser('deploy',
         help='deploy new contract to the network')
+    parser_deploy.add_argument('--ignore-revert', action='store_true',
+        help='do not terminate with exit code 1 on transaction revert')
     parser_deploy.add_argument('--abi',
         help='contract ABI')
     parser_deploy.add_argument('--bin',
@@ -268,6 +270,8 @@ def parse_cmd_args():
 
     parser_send = subparsers.add_parser('send',
         help='send some ether from one account to another')
+    parser_send.add_argument('--ignore-revert', action='store_true',
+        help='do not terminate with exit code 1 on transaction revert')
     parser_send.add_argument('from_address',
         help='sender account address')
     parser_send.add_argument('to_address',
@@ -285,6 +289,8 @@ def parse_cmd_args():
 
     parser_tran = subparsers.add_parser('tran',
         help='send transaction to the network')
+    parser_tran.add_argument('--ignore-revert', action='store_true',
+        help='do not terminate with exit code 1 on transaction revert')
     parser_tran.add_argument('--abi',
         help='contract ABI')
     parser_tran.add_argument('from_address',
@@ -480,6 +486,12 @@ def do_deploy(args):
     retval = json.loads(retval)
     printTransactionReceipt(retval)
     write_receipt(args, retval)
+    if retval.get('status') == '0x0':
+        if args.ignore_revert:
+            LOGGER.warning("transaction reverted")
+        else:
+            LOGGER.critical("transaction reverted")
+            sys.exit(1)
     exec_report(args, retval['contractAddress'])
 
 
@@ -602,6 +614,12 @@ def do_send(args):
     retval = json.loads(retval)
     printTransactionReceipt(retval)
     write_receipt(args, retval)
+    if retval.get('status') == '0x0':
+        if args.ignore_revert:
+            LOGGER.warning("transaction reverted")
+        else:
+            LOGGER.critical("transaction reverted")
+            sys.exit(1)
 
 
 def do_tran(args):
@@ -654,6 +672,12 @@ def do_tran(args):
     retval = json.loads(retval)
     printTransactionReceipt(retval)
     write_receipt(args, retval)
+    if retval.get('status') == '0x0':
+        if args.ignore_revert:
+            LOGGER.warning("transaction reverted")
+        else:
+            LOGGER.critical("transaction reverted")
+            sys.exit(1)
 
 
 def printTransactionReceipt(rcp):
