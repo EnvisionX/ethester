@@ -1,3 +1,10 @@
+ethester (0.8.0) unstable; urgency=low
+
+  * Terminate with error on transaction revert
+  * Fix docs installation path
+
+ -- Aleksey Morarash <aleksey.morarash@gmail.com>  Wed, 05 Sep 2018 17:17:38 +0300
+
 ethester (0.7.0) unstable; urgency=low
 
   * Update index readme page, package description
