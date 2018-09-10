@@ -1106,6 +1106,7 @@ def canonicalize_method_param(value, param_type):
 
     :rtype: string
     """
+    assert isinstance(value, (str, unicode))
     if param_type in ('uint256', 'uint'):
         try:
             value = str(parse_ether(value))
@@ -1114,8 +1115,13 @@ def canonicalize_method_param(value, param_type):
     elif param_type in ('address', 'string'):
         if value[0] not in ('"', "'"):
             value = '"%s"' % (value,)
-    elif param_type in ('uint[]', 'uint256[]'):
-        value = '[%s]' % (','.join(value),)
+    elif 'int' in param_type and param_type.endswith('[]'):
+        try:
+            value = json.dumps(json.loads(value), separators=(',', ':'))
+        except ValueError:
+            LOGGER.critical('Invalid value for %s: %r',
+                            param_type, value)
+            sys.exit(1)
     return value
 
 
