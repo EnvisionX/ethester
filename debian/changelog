@@ -1,3 +1,9 @@
+ethester (0.8.1) unstable; urgency=low
+
+  * Fix --expect for integer arrays
+
+ -- Aleksey Morarash <aleksey.morarash@envisionx.co>  Mon, 10 Sep 2018 11:38:13 +0300
+
 ethester (0.8.0) unstable; urgency=low
 
   * Terminate with error on transaction revert
