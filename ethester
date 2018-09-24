@@ -1088,7 +1088,7 @@ def paramToJSON(value, ptype):
     if ptype.startswith('uint') or ptype.startswith('int'):
         value = 'new BigNumber("%d")' % parse_ether(value)
     elif ptype in ('address', 'string'):
-        if value[0] not in ('"', "'"):
+        if value == '' or value[0] not in ('"', "'"):
             value = '"%s"' % value
     return value
 
@@ -1113,7 +1113,7 @@ def canonicalize_method_param(value, param_type):
         except ValueError:
             pass
     elif param_type in ('address', 'string'):
-        if value[0] not in ('"', "'"):
+        if len(value) == '' or value[0] not in ('"', "'"):
             value = '"%s"' % (value,)
     elif 'int' in param_type and param_type.endswith('[]'):
         try:
