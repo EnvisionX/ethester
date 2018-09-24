@@ -1087,7 +1087,7 @@ def paramToJSON(value, ptype):
     value = resolve_arg(value)
     if ptype.startswith('uint') or ptype.startswith('int'):
         value = 'new BigNumber("%d")' % parse_ether(value)
-    elif ptype in ('address', 'string'):
+    elif ptype in ('address', 'address[]', 'string'):
         if value == '' or value[0] not in ('"', "'"):
             value = '"%s"' % value
     return value
