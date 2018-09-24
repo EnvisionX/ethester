@@ -1,3 +1,12 @@
+ethester (0.8.2) unstable; urgency=low
+
+  * Cover address arrays with test
+  * Fix handling of address arrays
+  * Fix handling of empty strings
+  * Split tests to subtests
+
+ -- Aleksey Morarash <aleksey.morarash@envisionx.co>  Mon, 24 Sep 2018 11:29:17 +0300
+
 ethester (0.8.1) unstable; urgency=low
 
   * Fix --expect for integer arrays
