@@ -3,7 +3,8 @@ TESTS = \
 	t02_deploy \
 	t03_contract_methods \
 	t04_array_of_nums \
-	t05_events
+	t05_events \
+	t06_array_of_addresses
 
 .PHONY: all setup clean $(TESTS)
 
@@ -143,6 +144,19 @@ t05_events:
 	../ethester events 0 latest @run/contract --event Contract.MyEvent --quiet --expect 1
 	../ethester events 0 latest @run/contract --event Contract.MyEvent2 --quiet --expect 0
 	! ../ethester events 0 latest @run/contract --event Contract.MyEvent3
+
+t06_array_of_addresses:
+	@echo "\n*** START TEST $@ ***\n"
+	$(MAKE) clean prepare
+	../ethester deploy @run/acc1 Contract '' @run/acc1 0 -s > run/contract
+	../ethester new-account -s > run/a1
+	../ethester new-account -s > run/a2
+	../ethester new-account -s > run/a3
+	../ethester tran @run/acc1 @run/contract Contract.setAddrArr @run/a1 @run/a2 @run/a3
+	../ethester call @run/contract Contract.getAddrArr
+	../ethester call @run/contract Contract.getAddrArr --expect-json-field "0=\"`cat run/a1`\""
+	../ethester call @run/contract Contract.getAddrArr --expect-json-field "1=\"`cat run/a2`\""
+	../ethester call @run/contract Contract.getAddrArr --expect-json-field "2=\"`cat run/a3`\""
 
 prepare:
 	mkdir -p run

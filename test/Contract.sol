@@ -9,6 +9,7 @@ contract Contract {
     uint public arrA;
     uint public arrL;
     uint[] arrB;
+    address[] aa;
 
     function Contract(string a, address b, uint c) public {
         require(c != 99);
@@ -55,6 +56,14 @@ contract Contract {
 
     function getAll() public view returns (uint, uint, uint[]) {
         return (arrA, arrL, arrB);
+    }
+
+    function setAddrArr(address[] a) external {
+        aa = a;
+    }
+
+    function getAddrArr() public view returns (address[]) {
+        return aa;
     }
 
     function logSome(uint i, address a, uint b) external {
