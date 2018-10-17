@@ -19,7 +19,7 @@ all: $(TESTS)
 
 t01_balance:
 	@echo "\n*** START TEST $@ ***\n"
-	$(MAKE) clean prepare
+	$(MAKE) setup
 	../ethester balance @run/acc1 --expect-gt 3ether
 	../ethester balance @run/acc1 --expect-ge 3ether
 	! ../ethester balance @run/acc1 --expect 2ether
@@ -32,7 +32,7 @@ t01_balance:
 
 t02_deploy:
 	@echo "\n*** START TEST $@ ***\n"
-	$(MAKE) clean prepare
+	$(MAKE) setup
 	../ethester new-account -s > run/acc2
 	../ethester send @run/acc1 @run/acc2 10ether
 	! ../ethester deploy @run/acc2 Contract str1 @run/acc1 99
@@ -56,7 +56,7 @@ t02_deploy:
 
 t03_contract_methods:
 	@echo "\n*** START TEST $@ ***\n"
-	$(MAKE) clean prepare
+	$(MAKE) setup
 	../ethester new-account -s > run/acc2
 	../ethester send @run/acc1 @run/acc2 10ether
 	../ethester deploy @run/acc2 Contract str1 @run/acc1 2ether -s > run/contract
@@ -80,7 +80,7 @@ t03_contract_methods:
 
 t04_array_of_nums:
 	@echo "\n*** START TEST $@ ***\n"
-	$(MAKE) clean prepare
+	$(MAKE) setup
 	../ethester deploy @run/acc1 Contract str1 @run/acc1 2ether -s > run/contract
 	../ethester tran @run/acc1 @run/contract Contract.setArray gwei
 	../ethester call @run/contract Contract.arrA --expect gwei
@@ -126,7 +126,7 @@ t04_array_of_nums:
 
 t05_events:
 	@echo "\n*** START TEST $@ ***\n"
-	$(MAKE) clean prepare
+	$(MAKE) setup
 	../ethester deploy @run/acc1 Contract str1 @run/acc1 2ether -s > run/contract
 	../ethester tran @run/acc1 @run/contract Contract.logSome 1 @run/acc1 3
 	../ethester events -10 latest @run/contract --nice
@@ -147,7 +147,7 @@ t05_events:
 
 t06_array_of_addresses:
 	@echo "\n*** START TEST $@ ***\n"
-	$(MAKE) clean prepare
+	$(MAKE) setup
 	../ethester deploy @run/acc1 Contract '' @run/acc1 0 -s > run/contract
 	../ethester new-account -s > run/a1
 	../ethester new-account -s > run/a2
@@ -158,7 +158,8 @@ t06_array_of_addresses:
 	../ethester call @run/contract Contract.getAddrArr --expect-json-field "1=\"`cat run/a2`\""
 	../ethester call @run/contract Contract.getAddrArr --expect-json-field "2=\"`cat run/a3`\""
 
-prepare:
+setup:
+	$(MAKE) clean
 	mkdir -p run
 	solc -o run --bin --abi Contract.sol
 	nohup geth --datadir=run --dev >> run/geth.log 2>&1 & echo $$! > run/pid
