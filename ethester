@@ -972,6 +972,8 @@ def geth_exec(main_args, js_statement, errmsg=None):
             stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         timeouted = True
         timer = threading.Timer(geth_timeout, SUBPROCESS.kill)
+        outdata = ''
+        errdata = ''
         try:
             timer.start()
             (outdata, errdata) = SUBPROCESS.communicate()
@@ -998,7 +1000,8 @@ def geth_exec(main_args, js_statement, errmsg=None):
                 LOGGER.critical('geth process returned malformed JSON: %r.'
                     ' Extra output: %r', encoded_json, extra)
                 sys.exit(1)
-        LOGGER.critical('geth process finished with exit code %r', retcode)
+        LOGGER.critical('geth process finished with exit code %r.'
+            ' Stderr is: %r', retcode, errdata)
         sys.exit(1)
     except Exception as exc:
         if errmsg is not None:
