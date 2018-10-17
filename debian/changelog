@@ -1,3 +1,10 @@
+ethester (0.8.3) unstable; urgency=low
+
+  * Make error message more informative
+  * Rename auxiliary Makefile target
+
+ -- Aleksey Morarash <aleksey.morarash@envisionx.co>  Wed, 17 Oct 2018 16:11:54 +0300
+
 ethester (0.8.2) unstable; urgency=low
 
   * Cover address arrays with test
