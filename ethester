@@ -1229,7 +1229,7 @@ def parse_ether(s):
     """
     ss = resolve_arg(s).strip().lower()
     if ss == '':
-        ValueError('invalid ether amount: %r' % (s,))
+        raise ValueError('invalid ether amount: %r' % (s,))
     num = ''
     while ss:
         c, ss = ss[0], ss[1:]
@@ -1242,7 +1242,7 @@ def parse_ether(s):
     if not ss:
         return num
     if ss not in WEI_FACTORS:
-        ValueError('invalid ether amount: %r' % (s,))
+        raise ValueError('invalid ether amount: %r' % (s,))
     return num * WEI_FACTORS[ss]
 
 
@@ -1257,7 +1257,7 @@ def parse_timeout(s):
     """
     seconds = int(s)
     if seconds < 0:
-        ValueError('invalid timeout value: %r' % (s,))
+        raise ValueError('invalid timeout value: %r' % (s,))
     return seconds
 
 
@@ -1407,7 +1407,7 @@ def parse_method(s):
     """
     a = resolve_arg(s).split('.')
     if len(a) != 2 or not a[0] or not a[1]:
-        ValueError('bad method: %r' % s)
+        raise ValueError('bad method: %r' % s)
     return (a[0], a[1])
 
 
@@ -1422,7 +1422,7 @@ def parse_event_name(s):
     """
     a = resolve_arg(s).split('.')
     if len(a) != 2 or not a[0] or not a[1]:
-        ValueError('bad event: %r' % s)
+        raise ValueError('bad event: %r' % s)
     return (a[0], a[1])
 
 
