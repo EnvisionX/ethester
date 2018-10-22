@@ -66,6 +66,16 @@ contract Contract {
         return aa;
     }
 
+    function getArrays(uint n, uint[] a) public pure returns (uint[], uint[]) {
+        uint[] memory res1 = new uint[](a.length);
+        uint[] memory res2 = new uint[](a.length);
+        for (uint i; i < a.length; i++) {
+            res1[i] = a[i]*n*2;
+            res2[i] = a[i]*n;
+        }
+        return (res1, res2);
+    }
+
     function logSome(uint i, address a, uint b) external {
         emit MyEvent(i, a, b);
     }

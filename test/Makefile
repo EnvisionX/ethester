@@ -4,7 +4,8 @@ TESTS = \
 	t03_contract_methods \
 	t04_array_of_nums \
 	t05_events \
-	t06_array_of_addresses
+	t06_array_of_addresses \
+	t07_ret_arrays
 
 .PHONY: all setup clean $(TESTS)
 
@@ -157,6 +158,18 @@ t06_array_of_addresses:
 	../ethester call @run/contract Contract.getAddrArr --expect-json-field "0=\"`cat run/a1`\""
 	../ethester call @run/contract Contract.getAddrArr --expect-json-field "1=\"`cat run/a2`\""
 	../ethester call @run/contract Contract.getAddrArr --expect-json-field "2=\"`cat run/a3`\""
+
+t07_ret_arrays:
+	@echo "\n*** START TEST $@ ***\n"
+	$(MAKE) setup
+	../ethester deploy @run/acc1 Contract z @run/acc1 0 -s > run/contract
+	../ethester call @run/contract Contract.getArrays 2 4 5 6
+	../ethester call @run/contract Contract.getArrays 2 4 5 6 --expect-json-field 0.0=16
+	../ethester call @run/contract Contract.getArrays 2 4 5 6 --expect-json-field 0.1=20
+	../ethester call @run/contract Contract.getArrays 2 4 5 6 --expect-json-field 0.2=24
+	../ethester call @run/contract Contract.getArrays 2 4 5 6 --expect-json-field 1.0=8
+	../ethester call @run/contract Contract.getArrays 2 4 5 6 --expect-json-field 1.1=10
+	../ethester call @run/contract Contract.getArrays 2 4 5 6 --expect-json-field 1.2=12
 
 setup:
 	$(MAKE) clean
