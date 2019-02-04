@@ -482,7 +482,7 @@ def do_deploy(args):
         abi, cargs, sender, price_to_js(gas_limit),
         price_to_js(gas_price), bytecode, get_tx_timeout(args))
     dump_hook(args, 'deploy', contract, js)
-    retval, _ = geth_exec(args, js.replace('\n', '', -1))
+    retval, _ = geth_exec(args, js)
     retval = json.loads(retval)
     printTransactionReceipt(retval)
     write_receipt(args, retval)
@@ -542,7 +542,7 @@ def do_call(args):
         res;
         """ % (abi, resolve_arg(args.contract_address),
                resolve_arg(method), cargs, len(rettype))
-        retval, _ = geth_exec(args, js.replace('\n', '', -1))
+        retval, _ = geth_exec(args, js)
         retval = json.loads(retval)
         LOGGER.debug('decoded JSON: %r', retval)
     if len(rettype) == 1:
@@ -610,7 +610,7 @@ def do_send(args):
         price_to_js(gas_limit), price_to_js(gas_price),
         price_to_js(args.value), data, get_tx_timeout(args))
     dump_hook(args, 'transfer', '%s-%s' % (sender, receiver), js)
-    retval, _ = geth_exec(args, js.replace('\n', '', -1))
+    retval, _ = geth_exec(args, js)
     retval = json.loads(retval)
     printTransactionReceipt(retval)
     write_receipt(args, retval)
@@ -668,7 +668,7 @@ def do_tran(args):
         sender, price_to_js(gas_limit), price_to_js(gas_price),
         price_to_js(args.value), get_tx_timeout(args))
     dump_hook(args, 'tran', '%s.%s' % (contract, method), js)
-    retval, _ = geth_exec(args, js.replace('\n', '', -1))
+    retval, _ = geth_exec(args, js)
     retval = json.loads(retval)
     printTransactionReceipt(retval)
     write_receipt(args, retval)
@@ -784,7 +784,6 @@ def do_events(args):
     f.stopWatching();
     JSON.stringify(x);
     """ % (args.from_block, args.to_block, addresses, topics)
-    js = js.replace('\n', '', -1)
     # read events
     retval, _ = geth_exec(args, js)
     retval = json.loads(retval)
