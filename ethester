@@ -970,21 +970,22 @@ def geth_exec(main_args, js_statement, errmsg=None):
     try:
         SUBPROCESS = subprocess.Popen(args, stdin=None, close_fds=True,
             stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        timeouted = True
-        timer = threading.Timer(geth_timeout, SUBPROCESS.kill)
+        state = {'timeout': False, 'process': SUBPROCESS}
+        def kill_by_timeout():
+            state['timeout'] = True
+            state['process'].kill()
+        timer = threading.Timer(geth_timeout, kill_by_timeout)
         outdata = ''
         errdata = ''
         try:
             timer.start()
             (outdata, errdata) = SUBPROCESS.communicate()
-            timeouted = False
         finally:
             timer.cancel()
-        if timeouted:
+        if state['timeout']:
             LOGGER.critical('running geth process exceeded'
-                ' configured max timeout.')
-            LOGGER.critical('stdout is: %r', outdata)
-            LOGGER.critical('stderr is: %r', errdata)
+                ' configured max timeout (%d seconds).', geth_timeout)
+            sys.exit(1)
         else:
             LOGGER.debug('stdout is: %r', outdata)
             LOGGER.debug('stderr is: %r', errdata)
