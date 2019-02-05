@@ -478,7 +478,13 @@ def do_deploy(args):
         txRcp = eth.getTransactionReceipt(txIns.transactionHash);
         if (txRcp != null) break;
     };
-    if (txRcp == null) { throw 'error: timeout'; };
+    if (txRcp == null) {
+        txRcp = {
+            error: 'timeout',
+            elapsed: elapsed,
+            txHash: txIns.transactionHash
+        };
+    };
     JSON.stringify(txRcp);
     """ % (sender, password,
         abi, cargs, sender, price_to_js(gas_limit),
@@ -608,7 +614,13 @@ def do_send(args):
         txRcp = eth.getTransactionReceipt(txHash);
         if (txRcp != null) break;
     };
-    if (txRcp == null) { throw 'error: timeout'; };
+    if (txRcp == null) {
+        txRcp = {
+            error: 'timeout',
+            elapsed: elapsed,
+            txHash: txHash
+        };
+    };
     JSON.stringify(txRcp);
     """ % (sender, password, sender, receiver,
         price_to_js(gas_limit), price_to_js(gas_price),
@@ -668,7 +680,13 @@ def do_tran(args):
         txRcp = eth.getTransactionReceipt(txHash);
         if (txRcp != null) break;
     };
-    if (txRcp == null) { throw 'error: timeout'; };
+    if (txRcp == null) {
+        txRcp = {
+            error: 'timeout',
+            elapsed: elapsed,
+            txHash: txHash
+        };
+    };
     JSON.stringify(txRcp);
     """ % (sender, password, abi, receiver, method, cargs,
         sender, price_to_js(gas_limit), price_to_js(gas_price),
@@ -1001,7 +1019,13 @@ def geth_exec(main_args, js_statement, errmsg=None):
             LOGGER.debug('got extra data is: %r', extra)
             LOGGER.debug('got encoded JSON is: %r', encoded_json)
             try:
-                return (json.loads(encoded_json), extra)
+                obj = json.loads(encoded_json)
+                if isinstance(obj, dict) and str(obj.get('error'), '') == 'timeout':
+                    txHash = str(obj['txHash'])
+                    LOGGER.critical('transaction %s timeouted (%ds elapsed)',
+                        txHash, obj['elapsed'])
+                    sys.exit(1)
+                return obj, extra
             except ValueError as exc:
                 LOGGER.critical('geth process returned malformed JSON: %r.'
                     ' Extra output: %r', encoded_json, extra)
