@@ -851,7 +851,7 @@ def expect_equal(retval, expected, abi=None, method=None, value_type=None):
         outputs_info = get_method_info(abi, method).get(u'outputs', [])
         if len(outputs_info) != 1:
             types = ','.join([str(i[u'type']) for i in outputs_info])
-            LOGGER.critical('method you cannot use --expect with %s(%s)',
+            LOGGER.critical('you cannot use --expect with method %s(%s)',
                 method, types)
             sys.exit(1)
         value_type = str(outputs_info[0][u'type'])
