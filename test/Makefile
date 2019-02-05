@@ -36,9 +36,9 @@ t02_deploy:
 	$(MAKE) setup
 	../ethester new-account -s > run/acc2
 	../ethester send @run/acc1 @run/acc2 10ether
-	! ../ethester deploy @run/acc2 Contract str1 @run/acc1 99
+	../ethester deploy --expect-revert @run/acc2 Contract str1 @run/acc1 99
 	../ethester deploy @run/acc2 Contract str1 @run/acc1 2ether -s > run/contract
-	! ../ethester send @run/acc1 @run/contract ether
+	../ethester send --expect-revert @run/acc1 @run/contract ether
 	../ethester call @run/contract Contract.name --expect str1
 	! ../ethester call @run/contract Contract.name --expect str2
 	../ethester call @run/contract Contract.addr --expect @run/acc1
@@ -67,7 +67,7 @@ t03_contract_methods:
 	../ethester tran @run/acc2 @run/contract Contract.setAddr @run/acc2
 	../ethester call @run/contract Contract.addr --expect @run/acc2
 	! ../ethester call @run/contract Contract.addr --expect @run/acc1
-	! ../ethester tran @run/acc2 @run/contract Contract.setNumber 99
+	../ethester tran --expect-revert @run/acc2 @run/contract Contract.setNumber 99
 	../ethester call @run/contract Contract.number --expect 2ether
 	../ethester tran @run/acc2 @run/contract Contract.setNumber 3ether
 	../ethester call @run/contract Contract.number --expect 3ether
