@@ -232,6 +232,8 @@ def parse_cmd_args():
         help='write transaction receipt to a file')
     parser_deploy.add_argument('--expect-revert', action='store_true',
         help='expect transaction will be reverted')
+    parser_deploy.add_argument('--expect-tx-timeout', action='store_true',
+        help='expect transaction will not be mined in time')
     parser_deploy.set_defaults(func=do_deploy)
 
     parser_call = subparsers.add_parser('call',
@@ -289,6 +291,8 @@ def parse_cmd_args():
         help='write transaction receipt to a file')
     parser_send.add_argument('--expect-revert', action='store_true',
         help='expect transaction will be reverted')
+    parser_send.add_argument('--expect-tx-timeout', action='store_true',
+        help='expect transaction will not be mined in time')
     parser_send.set_defaults(func=do_send)
 
     parser_tran = subparsers.add_parser('tran',
@@ -314,6 +318,8 @@ def parse_cmd_args():
         help='write transaction receipt to a file')
     parser_tran.add_argument('--expect-revert', action='store_true',
         help='expect transaction will be reverted')
+    parser_tran.add_argument('--expect-tx-timeout', action='store_true',
+        help='expect transaction will not be mined in time')
     parser_tran.set_defaults(func=do_tran)
 
     parser_get_code = subparsers.add_parser('get-code',
@@ -1037,8 +1043,15 @@ def geth_exec(main_args, js_statement, errmsg=None):
                 obj = json.loads(encoded_json)
                 if isinstance(obj, dict) and str(obj.get('error'), '') == 'timeout':
                     txHash = str(obj['txHash'])
+                    if args.expect_tx_timeout:
+                        LOGGER.info('assertion tx %s timeout - OK', txHash)
+                        sys.exit(0)
                     LOGGER.critical('transaction %s timeouted (%ds elapsed)',
                         txHash, obj['elapsed'])
+                    sys.exit(1)
+                elif isinstance(obj, dict) and not args.expect_tx_timeout:
+                    LOGGER.critical('assertion failed: transaction ' +
+                        'mined in time. Receipt: %s', json.dumps(obj))
                     sys.exit(1)
                 return obj, extra
             except ValueError as exc:
