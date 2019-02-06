@@ -1529,8 +1529,12 @@ def write_receipt(args, tran_receipt):
         f = os.environ.get(WRITE_RECEIPT, None)
         if f is None:
             return
+    if f == '-':
+        LOGGER.info('writing transaction receipt to stdout...')
+        json.dump(tran_receipt, sys.stdout)
+        return
+    LOGGER.info('writing transaction receipt to %r...', f)
     with open(f, 'w') as fd:
-        LOGGER.info('writing transaction receipt to %r...', f)
         json.dump(tran_receipt, fd)
 
 
