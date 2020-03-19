@@ -2,7 +2,7 @@ Source: ethester
 Section: utils
 Priority: extra
 Maintainer: Aleksey Morarash <aleksey.morarash@gmail.com>
-Build-Depends: debhelper, python, ethereum, solidity
+Build-Depends: debhelper, python, ethereum, solidity, envx-tests-commons
 Standards-Version: 4.1.4
 Homepage: https://github.com/EnvisionX/ethester
 

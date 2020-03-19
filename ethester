@@ -552,7 +552,8 @@ def do_call(args):
                 return JSON.stringify(v);
             }
         };
-        var res = fmt(eth.contract(%s).at('%s').%s(%s));
+        eth.defaultAccount=eth.accounts[0];
+        var res = fmt(eth.contract(%s).at('%s').%s.call(%s));
         if (%d == 1) res = "[" + res + "]";
         res;
         """ % (abi, resolve_arg(args.contract_address),

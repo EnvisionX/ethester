@@ -1,4 +1,4 @@
-pragma solidity ^0.4.20;
+pragma solidity >=0.4.20;
 
 contract Contract {
 
@@ -11,18 +11,18 @@ contract Contract {
     uint[] arrB;
     address[] aa;
 
-    function Contract(string a, address b, uint c) public {
+    constructor (string memory a, address b, uint c) public {
         require(c != 99);
         name = a;
         addr = b;
         number = c;
     }
 
-    function () external payable {
+    receive () external payable {
         revert();
     }
 
-    function setName(string a) external {
+    function setName(string calldata a) external {
         name = a;
     }
 
@@ -40,13 +40,13 @@ contract Contract {
         revert();
     }
 
-    function setArray(uint a, uint[] b) external {
+    function setArray(uint a, uint[] calldata b) external {
         arrA = a;
         arrL = b.length;
         arrB = b;
     }
 
-    function getArray() public view returns (uint[]) {
+    function getArray() public view returns (uint[] memory) {
         return arrB;
     }
 
@@ -54,19 +54,23 @@ contract Contract {
         return arrB[i];
     }
 
-    function getAll() public view returns (uint, uint, uint[]) {
+    function getAll() public view returns (uint, uint, uint[] memory) {
         return (arrA, arrL, arrB);
     }
 
-    function setAddrArr(address[] a) external {
+    function setAddrArr(address[] calldata a) external {
         aa = a;
     }
 
-    function getAddrArr() public view returns (address[]) {
+    function getAddrArr() public view returns (address[] memory) {
         return aa;
     }
 
-    function getArrays(uint n, uint[] a) public pure returns (uint[], uint[]) {
+    function getArrays(uint n, uint[] memory a)
+        public
+        pure
+        returns (uint[] memory, uint[] memory)
+    {
         uint[] memory res1 = new uint[](a.length);
         uint[] memory res2 = new uint[](a.length);
         for (uint i; i < a.length; i++) {

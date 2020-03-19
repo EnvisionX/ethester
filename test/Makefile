@@ -14,8 +14,10 @@ export ETHESTER_GETH_IPC = run/geth.ipc
 export ETHESTER_CONTRACT_PATH = run/
 export ETHESTER_LOGLEVEL = info
 
-all: $(TESTS)
-	$(MAKE) clean
+export WAIT_IPC_SERVER = /usr/lib/envx-test/commons/wait_ipc_server.py
+
+all:
+	$(MAKE) -j1 $(TESTS) clean
 	@echo "\n*** DONE ***\n"
 
 t01_balance:
@@ -175,11 +177,12 @@ setup:
 	$(MAKE) clean
 	mkdir -p run
 	solc -o run --bin --abi Contract.sol
-	nohup geth --datadir=run --dev >> run/geth.log 2>&1 & echo $$! > run/pid
-	sleep 3s
+	nohup geth --cache 512 --rpc --datadir run --dev --allow-insecure-unlock > run/geth.log 2>&1 &
+	$(WAIT_IPC_SERVER) run/geth.ipc
 	../ethester exec "miner.start()" null && sleep 5s
 	../ethester exec "eth.accounts[0]" -s > run/acc1
 
 clean:
-	test -f run/pid && kill -9 `cat run/pid` || true
+	systemctl stop ethereum || true
+	killall -9 geth || true
 	rm -rf -- run
