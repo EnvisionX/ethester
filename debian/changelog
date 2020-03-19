@@ -1,3 +1,9 @@
+ethester (0.10.0) unstable; urgency=low
+
+  * Fix --write-receipt cmd option behavior
+
+ -- Oleksii Klitovchenko <oleksii.klitovchenko@envisionx.co>  Thu, 19 Mar 2020 09:06:22 +0200
+
 ethester (0.9.0) unstable; urgency=low
 
   * Add --expect-tx-timeout cmd option
